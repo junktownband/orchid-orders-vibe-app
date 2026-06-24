@@ -251,7 +251,7 @@ sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orch
 sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orchid-control/orchid.env && set +a && corepack pnpm --filter @orchid/shared build"
 sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orchid-control/orchid.env && set +a && corepack pnpm --filter @orchid/db build"
 sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orchid-control/orchid.env && set +a && corepack pnpm -r typecheck"
-sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orchid-control/orchid.env && set +a && corepack pnpm -r test"
+sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orchid-control/orchid.env && set +a && NODE_ENV=test corepack pnpm -r test"
 sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orchid-control/orchid.env && set +a && corepack pnpm -r build"
 ```
 

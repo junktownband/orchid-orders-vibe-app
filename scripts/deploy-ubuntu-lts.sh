@@ -273,7 +273,7 @@ install_and_build_application() {
 
   if [[ "${ORCHID_SKIP_VERIFY:-0}" != "1" ]]; then
     run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && corepack pnpm -r typecheck"
-    run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && corepack pnpm -r test"
+    run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && NODE_ENV=test corepack pnpm -r test"
   fi
 
   run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && corepack pnpm -r build"
