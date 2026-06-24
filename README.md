@@ -108,7 +108,7 @@ bash scripts/deploy-ubuntu-lts.sh
 ```bash
 systemctl status nginx --no-pager
 systemctl status postgresql --no-pager
-sudo -u orchid -H pm2 status
+sudo -u orchid -H "$(command -v pm2)" status
 ```
 
 Проверить health endpoint:
@@ -139,11 +139,11 @@ cat /etc/orchid-control/initial-admin-password.txt
 ### 9. Логи и перезапуск
 
 ```bash
-sudo -u orchid -H pm2 logs orchid-api
+sudo -u orchid -H "$(command -v pm2)" logs orchid-api
 ```
 
 ```bash
-sudo -u orchid -H pm2 restart orchid-api --update-env
+sudo -u orchid -H "$(command -v pm2)" restart orchid-api --update-env
 ```
 
 ```bash

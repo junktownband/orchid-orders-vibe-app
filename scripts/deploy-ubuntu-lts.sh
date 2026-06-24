@@ -25,6 +25,7 @@ SEED_PASSWORD="$INPUT_SEED_PASSWORD"
 ENABLE_LETSENCRYPT="${ORCHID_ENABLE_LETSENCRYPT:-0}"
 CERTBOT_EMAIL="${ORCHID_CERTBOT_EMAIL:-}"
 NODE_MAJOR="${NODE_MAJOR:-22}"
+PM2_BIN="${PM2_BIN:-}"
 
 log() {
   printf '\n==> %s\n' "$*"
@@ -158,6 +159,10 @@ install_node() {
   corepack enable
   corepack prepare pnpm@9.15.4 --activate
   npm install -g pm2@5.4.3
+  PM2_BIN="$(command -v pm2)"
+  if [[ -z "$PM2_BIN" ]]; then
+    fail "pm2 was installed but was not found in root PATH."
+  fi
 }
 
 ensure_app_user() {
@@ -283,10 +288,10 @@ install_and_build_application() {
 
 configure_pm2() {
   log "Starting API with PM2"
-  run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && pm2 startOrReload ecosystem.config.cjs --only orchid-api --update-env"
-  run_as_app_user "pm2 save"
+  run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && '$PM2_BIN' startOrReload ecosystem.config.cjs --only orchid-api --update-env"
+  run_as_app_user "'$PM2_BIN' save"
 
-  env PATH="$PATH:/usr/bin" pm2 startup systemd -u "$APP_USER" --hp "/var/lib/$APP_USER" >/tmp/orchid-pm2-startup.txt
+  env PATH="$PATH:/usr/bin:/usr/local/bin" "$PM2_BIN" startup systemd -u "$APP_USER" --hp "/var/lib/$APP_USER" >/tmp/orchid-pm2-startup.txt
   systemctl enable "pm2-$APP_USER" >/dev/null 2>&1 || true
 }
 
@@ -420,8 +425,8 @@ print_summary() {
     printf 'Initial password: %s\n' "$INITIAL_PASSWORD_FILE"
   fi
   printf '\nUseful checks:\n'
-  printf '  sudo -u %s -H pm2 status\n' "$APP_USER"
-  printf '  sudo -u %s -H pm2 logs orchid-api\n' "$APP_USER"
+  printf '  sudo -u %s -H %s status\n' "$APP_USER" "$PM2_BIN"
+  printf '  sudo -u %s -H %s logs orchid-api\n' "$APP_USER" "$PM2_BIN"
   printf '  curl -fsS https://%s/health\n' "$DOMAIN"
 }
 

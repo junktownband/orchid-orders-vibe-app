@@ -178,6 +178,7 @@ sudo apt-get install -y nodejs
 sudo corepack enable
 sudo corepack prepare pnpm@9.15.4 --activate
 sudo npm install -g pm2@5.4.3
+PM2_BIN="$(command -v pm2)"
 ```
 
 Описание:
@@ -279,9 +280,10 @@ sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orch
 ### 8. PM2
 
 ```bash
-sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orchid-control/orchid.env && set +a && pm2 startOrReload ecosystem.config.cjs --only orchid-api --update-env"
-sudo -u orchid -H pm2 save
-sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u orchid --hp /var/lib/orchid
+PM2_BIN="$(command -v pm2)"
+sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orchid-control/orchid.env && set +a && '$PM2_BIN' startOrReload ecosystem.config.cjs --only orchid-api --update-env"
+sudo -u orchid -H "$PM2_BIN" save
+sudo env PATH=$PATH:/usr/bin:/usr/local/bin "$PM2_BIN" startup systemd -u orchid --hp /var/lib/orchid
 ```
 
 Описание:
@@ -382,8 +384,9 @@ sudo certbot --nginx --redirect -d orchid.example.com --email owner@example.com 
 ```bash
 curl -fsS https://orchid.example.com/health
 curl -I https://orchid.example.com/
-sudo -u orchid -H pm2 status
-sudo -u orchid -H pm2 logs orchid-api --lines 100
+PM2_BIN="$(command -v pm2)"
+sudo -u orchid -H "$PM2_BIN" status
+sudo -u orchid -H "$PM2_BIN" logs orchid-api --lines 100
 sudo tail -n 100 /var/log/nginx/error.log
 ```
 
@@ -458,7 +461,8 @@ cd /opt/orchid-control
 sudo -u orchid -H git log --oneline -5
 sudo -u orchid -H git checkout <previous-good-sha>
 sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orchid-control/orchid.env && set +a && corepack pnpm install --frozen-lockfile --prod=false && corepack pnpm -r build"
-sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orchid-control/orchid.env && set +a && pm2 restart orchid-api --update-env"
+PM2_BIN="$(command -v pm2)"
+sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orchid-control/orchid.env && set +a && '$PM2_BIN' restart orchid-api --update-env"
 sudo systemctl reload nginx
 ```
 
