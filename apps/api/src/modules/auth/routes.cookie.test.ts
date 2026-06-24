@@ -56,6 +56,7 @@ describe("auth cookie settings", () => {
 
   it("marks refresh cookies as secure in production by default", async () => {
     vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ORCHID_COOKIE_SECURE", "");
 
     const app = await buildAuthRouteApp();
     const response = await app.inject({
