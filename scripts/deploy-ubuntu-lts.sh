@@ -268,6 +268,8 @@ install_and_build_application() {
   run_as_app_user "cd '$APP_DIR' && corepack pnpm --version"
   run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && corepack pnpm install --frozen-lockfile --prod=false"
   run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && corepack pnpm db:generate"
+  run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && corepack pnpm --filter @orchid/shared build"
+  run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && corepack pnpm --filter @orchid/db build"
 
   if [[ "${ORCHID_SKIP_VERIFY:-0}" != "1" ]]; then
     run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && corepack pnpm -r typecheck"
