@@ -9,7 +9,8 @@ APP_USER="${ORCHID_APP_USER:-orchid}"
 APP_DIR="${ORCHID_APP_DIR:-/opt/orchid-control}"
 ENV_DIR="${ORCHID_ENV_DIR:-/etc/orchid-control}"
 ENV_FILE="${ORCHID_ENV_FILE:-$ENV_DIR/orchid.env}"
-INITIAL_PASSWORD_FILE="${ORCHID_INITIAL_PASSWORD_FILE:-$ENV_DIR/initial-admin-password.txt}"
+INITIAL_PASSWORD_FILE="${ORCHID_INITIAL_PASSWORD_FILE:-$ENV_DIR/initial-admin-passwords.txt}"
+LEGACY_INITIAL_PASSWORD_FILE="$ENV_DIR/initial-admin-password.txt"
 SERVICE_FILE="/etc/systemd/system/orchid-api.service"
 PUBLIC_HOST="${ORCHID_PUBLIC_HOST:-${ORCHID_PUBLIC_IP:-}}"
 PUBLIC_PORT="${ORCHID_PUBLIC_PORT:-3000}"
@@ -22,13 +23,34 @@ INPUT_DB_PASSWORD="${ORCHID_DB_PASSWORD:-}"
 INPUT_JWT_ACCESS_SECRET="${JWT_ACCESS_SECRET:-}"
 INPUT_JWT_REFRESH_SECRET="${JWT_REFRESH_SECRET:-}"
 INPUT_SEED_PASSWORD="${ORCHID_SEED_PASSWORD:-}"
+INPUT_SEED_PASSWORD_SASHA="${ORCHID_SEED_PASSWORD_SASHA:-}"
+INPUT_SEED_PASSWORD_ROMA="${ORCHID_SEED_PASSWORD_ROMA:-}"
+INPUT_SEED_PASSWORD_YURA="${ORCHID_SEED_PASSWORD_YURA:-}"
+INPUT_SEED_PASSWORD_LENYA="${ORCHID_SEED_PASSWORD_LENYA:-}"
+INPUT_SEED_PASSWORD_VANYA="${ORCHID_SEED_PASSWORD_VANYA:-}"
+INPUT_SEED_PASSWORD_DIMA="${ORCHID_SEED_PASSWORD_DIMA:-}"
 DB_NAME="${INPUT_DB_NAME:-orchid_control}"
 DB_USER="${INPUT_DB_USER:-orchid}"
 DB_PASSWORD="$INPUT_DB_PASSWORD"
 JWT_ACCESS_SECRET="$INPUT_JWT_ACCESS_SECRET"
 JWT_REFRESH_SECRET="$INPUT_JWT_REFRESH_SECRET"
 SEED_PASSWORD="$INPUT_SEED_PASSWORD"
+SEED_PASSWORD_SASHA="$INPUT_SEED_PASSWORD_SASHA"
+SEED_PASSWORD_ROMA="$INPUT_SEED_PASSWORD_ROMA"
+SEED_PASSWORD_YURA="$INPUT_SEED_PASSWORD_YURA"
+SEED_PASSWORD_LENYA="$INPUT_SEED_PASSWORD_LENYA"
+SEED_PASSWORD_VANYA="$INPUT_SEED_PASSWORD_VANYA"
+SEED_PASSWORD_DIMA="$INPUT_SEED_PASSWORD_DIMA"
 NODE_MAJOR="${NODE_MAJOR:-22}"
+SEED_USER_KEYS=(SASHA ROMA YURA LENYA VANYA DIMA)
+SEED_USER_SPECS=(
+  "SASHA|sasha@orchid.local|Саша|OWNER"
+  "ROMA|roma@orchid.local|Рома|ADMIN"
+  "YURA|yura@orchid.local|Юра|ADMIN"
+  "LENYA|lenya@orchid.local|Леня|ADMIN"
+  "VANYA|vanya@orchid.local|Ваня|MANAGER"
+  "DIMA|dima@orchid.local|Дима|MASTER"
+)
 
 log() {
   printf '\n==> %s\n' "$*"
@@ -138,6 +160,13 @@ load_existing_env() {
   JWT_ACCESS_SECRET="${INPUT_JWT_ACCESS_SECRET:-${JWT_ACCESS_SECRET:-}}"
   JWT_REFRESH_SECRET="${INPUT_JWT_REFRESH_SECRET:-${JWT_REFRESH_SECRET:-}}"
   SEED_PASSWORD="${INPUT_SEED_PASSWORD:-${ORCHID_SEED_PASSWORD:-}}"
+
+  for seed_user_key in "${SEED_USER_KEYS[@]}"; do
+    local input_var="INPUT_SEED_PASSWORD_${seed_user_key}"
+    local env_var="ORCHID_SEED_PASSWORD_${seed_user_key}"
+    local target_var="SEED_PASSWORD_${seed_user_key}"
+    printf -v "$target_var" '%s' "${!input_var:-${!env_var:-${!target_var:-}}}"
+  done
 }
 
 validate_configuration() {
@@ -169,12 +198,43 @@ validate_configuration() {
     fail "ORCHID_API_PORT must be a TCP port from 1 to 65535."
   fi
 
-  for secret_name in DB_PASSWORD JWT_ACCESS_SECRET JWT_REFRESH_SECRET SEED_PASSWORD; do
+  for secret_name in DB_PASSWORD JWT_ACCESS_SECRET JWT_REFRESH_SECRET SEED_PASSWORD SEED_PASSWORD_SASHA SEED_PASSWORD_ROMA SEED_PASSWORD_YURA SEED_PASSWORD_LENYA SEED_PASSWORD_VANYA SEED_PASSWORD_DIMA; do
     local secret_value="${!secret_name}"
     if [[ -n "$secret_value" && ! "$secret_value" =~ ^[A-Za-z0-9._~-]+$ ]]; then
       fail "$secret_name may contain only letters, numbers, dot, underscore, tilde, and hyphen. Leave it empty to auto-generate a safe value."
     fi
   done
+}
+
+ensure_seed_passwords() {
+  for seed_user_key in "${SEED_USER_KEYS[@]}"; do
+    local target_var="SEED_PASSWORD_${seed_user_key}"
+
+    if [[ -z "${!target_var}" ]]; then
+      printf -v "$target_var" '%s' "$(random_alnum 24)"
+    fi
+  done
+}
+
+write_seed_password_file() {
+  {
+    printf 'email | name | role | password\n'
+
+    for seed_user_spec in "${SEED_USER_SPECS[@]}"; do
+      IFS='|' read -r seed_user_key seed_user_email seed_user_name seed_user_role <<<"$seed_user_spec"
+      local target_var="SEED_PASSWORD_${seed_user_key}"
+      printf '%s | %s | %s | %s\n' "$seed_user_email" "$seed_user_name" "$seed_user_role" "${!target_var}"
+    done
+  } > "$INITIAL_PASSWORD_FILE"
+
+  run_step "Setting seed passwords file owner" chown root:"$APP_USER" "$INITIAL_PASSWORD_FILE"
+  run_step "Setting seed passwords file permissions" chmod 0640 "$INITIAL_PASSWORD_FILE"
+
+  if [[ "$INITIAL_PASSWORD_FILE" != "$LEGACY_INITIAL_PASSWORD_FILE" ]]; then
+    run_step "Updating legacy seed password file path" cp "$INITIAL_PASSWORD_FILE" "$LEGACY_INITIAL_PASSWORD_FILE"
+    run_step "Setting legacy seed password file owner" chown root:"$APP_USER" "$LEGACY_INITIAL_PASSWORD_FILE"
+    run_step "Setting legacy seed password file permissions" chmod 0640 "$LEGACY_INITIAL_PASSWORD_FILE"
+  fi
 }
 
 install_system_packages() {
@@ -288,12 +348,8 @@ write_env_file() {
   JWT_ACCESS_SECRET="${JWT_ACCESS_SECRET:-$(random_hex 32)}"
   JWT_REFRESH_SECRET="${JWT_REFRESH_SECRET:-$(random_hex 32)}"
 
-  if [[ -z "$SEED_PASSWORD" ]]; then
-    SEED_PASSWORD="$(random_alnum 24)"
-    printf '%s\n' "$SEED_PASSWORD" > "$INITIAL_PASSWORD_FILE"
-    run_step "Setting initial password file owner" chown root:"$APP_USER" "$INITIAL_PASSWORD_FILE"
-    run_step "Setting initial password file permissions" chmod 0640 "$INITIAL_PASSWORD_FILE"
-  fi
+  ensure_seed_passwords
+  write_seed_password_file
 
   cat > "$ENV_FILE" <<EOF
 NODE_ENV=production
@@ -307,7 +363,12 @@ APP_URL=http://${PUBLIC_HOST}:${PUBLIC_PORT}
 API_URL=http://${PUBLIC_HOST}:${PUBLIC_PORT}/api
 VITE_API_URL=
 ORCHID_COOKIE_SECURE=false
-ORCHID_SEED_PASSWORD=${SEED_PASSWORD}
+ORCHID_SEED_PASSWORD_SASHA=${SEED_PASSWORD_SASHA}
+ORCHID_SEED_PASSWORD_ROMA=${SEED_PASSWORD_ROMA}
+ORCHID_SEED_PASSWORD_YURA=${SEED_PASSWORD_YURA}
+ORCHID_SEED_PASSWORD_LENYA=${SEED_PASSWORD_LENYA}
+ORCHID_SEED_PASSWORD_VANYA=${SEED_PASSWORD_VANYA}
+ORCHID_SEED_PASSWORD_DIMA=${SEED_PASSWORD_DIMA}
 PORT=${API_PORT}
 HOST=127.0.0.1
 EOF
@@ -426,7 +487,9 @@ print_summary() {
   printf 'Health check:    http://%s:%s/health\n' "$PUBLIC_HOST" "$PUBLIC_PORT"
   printf 'Environment:     %s\n' "$ENV_FILE"
   if [[ -f "$INITIAL_PASSWORD_FILE" ]]; then
-    printf 'Initial password: %s\n' "$INITIAL_PASSWORD_FILE"
+    printf 'Seed passwords:  %s\n' "$INITIAL_PASSWORD_FILE"
+    printf '\nSeed user credentials:\n'
+    sed 's/^/  /' "$INITIAL_PASSWORD_FILE"
   fi
   printf '\nUseful checks:\n'
   printf '  systemctl status orchid-api --no-pager\n'

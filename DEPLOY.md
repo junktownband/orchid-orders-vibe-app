@@ -31,7 +31,6 @@ Demo-заказы не создаются. Не запускайте `db:seed:de
 cd /path/to/orchid-local-saas-obsidian
 
 sudo ORCHID_DOMAIN=orchid.example.com \
-  ORCHID_SEED_PASSWORD='replace-with-strong-initial-password' \
   bash scripts/deploy-ubuntu-lts.sh
 ```
 
@@ -54,7 +53,6 @@ sudo ORCHID_DOMAIN=orchid.example.com \
 sudo ORCHID_DOMAIN=orchid.example.com \
   ORCHID_REPO_URL='git@github.com:OWNER/REPO.git' \
   ORCHID_REPO_REF='main' \
-  ORCHID_SEED_PASSWORD='replace-with-strong-initial-password' \
   bash scripts/deploy-ubuntu-lts.sh
 ```
 
@@ -71,7 +69,6 @@ sudo ORCHID_DOMAIN=orchid.example.com \
 sudo ORCHID_DOMAIN=orchid.example.com \
   ORCHID_ENABLE_LETSENCRYPT=1 \
   ORCHID_CERTBOT_EMAIL=owner@example.com \
-  ORCHID_SEED_PASSWORD='replace-with-strong-initial-password' \
   bash scripts/deploy-ubuntu-lts.sh
 ```
 
@@ -97,9 +94,19 @@ ORCHID_DOMAIN=orchid.example.com
 ORCHID_APP_DIR=/opt/orchid-control
 ORCHID_REPO_URL='git@github.com:OWNER/REPO.git'
 ORCHID_REPO_REF=main
-ORCHID_SEED_PASSWORD='initial-password-for-production-users'
 ORCHID_ENABLE_LETSENCRYPT=1
 ORCHID_CERTBOT_EMAIL=owner@example.com
+```
+
+Пароли seed-пользователей можно задать вручную, но обычно скрипт сам генерирует разные пароли:
+
+```bash
+ORCHID_SEED_PASSWORD_SASHA='generated-if-empty'
+ORCHID_SEED_PASSWORD_ROMA='generated-if-empty'
+ORCHID_SEED_PASSWORD_YURA='generated-if-empty'
+ORCHID_SEED_PASSWORD_LENYA='generated-if-empty'
+ORCHID_SEED_PASSWORD_VANYA='generated-if-empty'
+ORCHID_SEED_PASSWORD_DIMA='generated-if-empty'
 ```
 
 Редко используемые:
@@ -119,13 +126,13 @@ ORCHID_ALLOW_UNSUPPORTED_UBUNTU=1
 
 Если передаете пароли и JWT-секреты вручную, используйте только URL/shell-safe символы: латиницу, цифры, `.`, `_`, `~`, `-`. Если оставить секреты пустыми, скрипт сгенерирует безопасные значения сам.
 
-Если `ORCHID_SEED_PASSWORD` не задан, скрипт генерирует пароль сам и сохраняет его в:
+Если per-user seed-пароли не заданы, скрипт генерирует их сам, применяет к пользователям и сохраняет таблицу в:
 
 ```bash
-sudo cat /etc/orchid-control/initial-admin-password.txt
+sudo cat /etc/orchid-control/initial-admin-passwords.txt
 ```
 
-Этот пароль применяется ко всем production-пользователям из seed. После первого запуска его нужно заменить операционно.
+Для совместимости скрипт также обновляет старый путь `/etc/orchid-control/initial-admin-password.txt`, но новый основной файл: `initial-admin-passwords.txt`.
 
 ## Production env
 
@@ -145,7 +152,12 @@ JWT_REFRESH_SECRET=<random>
 APP_URL=https://orchid.example.com
 API_URL=https://orchid.example.com/api
 VITE_API_URL=
-ORCHID_SEED_PASSWORD=<initial-password>
+ORCHID_SEED_PASSWORD_SASHA=<password>
+ORCHID_SEED_PASSWORD_ROMA=<password>
+ORCHID_SEED_PASSWORD_YURA=<password>
+ORCHID_SEED_PASSWORD_LENYA=<password>
+ORCHID_SEED_PASSWORD_VANYA=<password>
+ORCHID_SEED_PASSWORD_DIMA=<password>
 PORT=3005
 HOST=127.0.0.1
 ```

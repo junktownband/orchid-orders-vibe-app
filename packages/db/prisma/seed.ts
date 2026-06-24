@@ -14,73 +14,14 @@ import {
   TaxSubject
 } from "@prisma/client";
 
+import { productionUsers, resolveSeedPasswordForUser, type SeedMode } from "../src/seed-users.js";
+
 const prisma = new PrismaClient();
 
 const organizationId = "seed-org-orchid";
 const organizationName = "Orchid Workshop";
-const seedMode =
+const seedMode: SeedMode =
   process.argv.includes("--demo") || process.env.ORCHID_SEED_MODE === "demo" ? "demo" : "production";
-const demoSeedPassword = "orchid12345";
-
-function resolveSeedPassword() {
-  const password = process.env.ORCHID_SEED_PASSWORD;
-
-  if (password) {
-    return password;
-  }
-
-  if (seedMode === "production") {
-    throw new Error("ORCHID_SEED_PASSWORD is required for production seed.");
-  }
-
-  return demoSeedPassword;
-}
-
-const seedPassword = resolveSeedPassword();
-
-const productionUsers: Array<{
-  email: string;
-  name: string;
-  role: Role;
-  commissionPercent?: Prisma.Decimal | null;
-}> = [
-  {
-    email: "sasha@orchid.local",
-    name: "Саша",
-    role: Role.OWNER,
-    commissionPercent: null
-  },
-  {
-    email: "roma@orchid.local",
-    name: "Рома",
-    role: Role.ADMIN,
-    commissionPercent: null
-  },
-  {
-    email: "yura@orchid.local",
-    name: "Юра",
-    role: Role.ADMIN,
-    commissionPercent: null
-  },
-  {
-    email: "lenya@orchid.local",
-    name: "Леня",
-    role: Role.ADMIN,
-    commissionPercent: null
-  },
-  {
-    email: "vanya@orchid.local",
-    name: "Ваня",
-    role: Role.MANAGER,
-    commissionPercent: null
-  },
-  {
-    email: "dima@orchid.local",
-    name: "Дима",
-    role: Role.MASTER,
-    commissionPercent: new Prisma.Decimal("0.3000")
-  }
-];
 
 const demoOrderIds = ["seed-order-finance-90001", "seed-order-active-90002"];
 const demoCustomerIds = ["seed-customer-finance", "seed-customer-active"];
@@ -91,8 +32,8 @@ const demoExpenseIds = [
   "seed-expense-finance-salary"
 ];
 
-async function seedPasswordHash() {
-  return bcrypt.hash(seedPassword, 10);
+async function seedPasswordHash(password: string) {
+  return bcrypt.hash(password, 10);
 }
 
 async function upsertUser(params: {
@@ -145,7 +86,7 @@ async function upsertMembership(params: {
   });
 }
 
-async function seedProductionUsers(params: { organizationId: string; passwordHash: string }) {
+async function seedProductionUsers(params: { organizationId: string }) {
   const seededUsers: Array<{
     email: string;
     user: Awaited<ReturnType<typeof upsertUser>>;
@@ -153,10 +94,11 @@ async function seedProductionUsers(params: { organizationId: string; passwordHas
   }> = [];
 
   for (const productionUser of productionUsers) {
+    const passwordHash = await seedPasswordHash(resolveSeedPasswordForUser(productionUser, process.env, seedMode));
     const user = await upsertUser({
       email: productionUser.email,
       name: productionUser.name,
-      passwordHash: params.passwordHash
+      passwordHash
     });
     const membership = await upsertMembership({
       organizationId: params.organizationId,
@@ -626,7 +568,6 @@ async function seedDemoOrders(params: {
 }
 
 async function main() {
-  const passwordHash = await seedPasswordHash();
   const organization = await prisma.organization.upsert({
     where: {
       id: organizationId
@@ -645,8 +586,7 @@ async function main() {
   });
 
   const seededUsers = await seedProductionUsers({
-    organizationId: organization.id,
-    passwordHash
+    organizationId: organization.id
   });
 
   await prisma.organizationSetting.upsert({

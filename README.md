@@ -156,18 +156,15 @@ curl -fsS "https://${ORCHID_DOMAIN}/health"
 curl -fsS "http://${ORCHID_DOMAIN}/health"
 ```
 
-### 8. Получить пароль первого входа
+### 8. Получить логины и пароли первого входа
 
 ```bash
-cat /etc/orchid-control/initial-admin-password.txt
+cat /etc/orchid-control/initial-admin-passwords.txt
 ```
 
-Первый пользователь:
+Файл содержит таблицу всех seed-пользователей: `email | name | role | password`.
 
-- email: `sasha@orchid.local`
-- password: значение из `/etc/orchid-control/initial-admin-password.txt`
-
-После первого входа сохрани пароль в менеджере паролей. Файл с паролем на сервере доступен только `root` и группе приложения, но его все равно лучше считать временным секретом.
+После первого входа сохрани пароли в менеджере паролей. Файл с паролями на сервере доступен только `root` и группе приложения, но его все равно лучше считать временным секретом.
 
 ### 9. Логи и перезапуск
 
@@ -206,10 +203,10 @@ bash scripts/deploy-ubuntu-lts.sh
 
 1. Не коммитьте `.env`: файл уже добавлен в `.gitignore`.
 2. Не используйте значения из `.env.example` как настоящие секреты.
-3. Для обычного seed всегда задавайте `ORCHID_SEED_PASSWORD`.
+3. Для production seed используй разные пароли через `ORCHID_SEED_PASSWORD_SASHA`, `ORCHID_SEED_PASSWORD_ROMA`, `ORCHID_SEED_PASSWORD_YURA`, `ORCHID_SEED_PASSWORD_LENYA`, `ORCHID_SEED_PASSWORD_VANYA`, `ORCHID_SEED_PASSWORD_DIMA`; deploy-скрипты сгенерируют их сами, если переменные не заданы.
 4. `db:seed:demo` используйте только локально: он создает демо-заказы и может использовать пароль `orchid12345`.
 5. В production API должен слушать `127.0.0.1` за nginx/reverse proxy, а наружу должны быть открыты только HTTP/HTTPS.
-6. После первого входа сохраните seed-пароль в менеджере паролей и удалите локальный файл `.orchid-initial-password.txt`.
+6. После первого входа сохраните seed-пароли в менеджере паролей и удалите локальный файл `.orchid-initial-password.txt`, если создавали его вручную.
 
 ## Локальные Требования Для Windows
 
