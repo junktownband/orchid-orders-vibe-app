@@ -10,6 +10,165 @@ Local-first B2B SaaS для управления ремонтной мастер
 - Process manager: PM2 для production-like запуска.
 - Package manager: `pnpm@9.15.4` через Corepack.
 
+## Production На Ubuntu Из Root
+
+Этот раздел рассчитан на чистый Ubuntu Server, где изначально есть только пользователь `root`.
+
+Важно: приложение не должно постоянно работать от `root`. Деплой-скрипт запускается от `root`, сам ставит системные пакеты, создает отдельного пользователя `orchid`, копирует приложение в `/opt/orchid-control`, пишет секреты в `/etc/orchid-control/orchid.env`, запускает API через PM2 от пользователя `orchid` и настраивает nginx.
+
+Для нормального входа в приложение нужен домен с HTTPS. Без HTTPS production cookies будут помечены как `secure`, поэтому по чистому `http://IP` можно проверить `/health`, но логин в браузере может не работать корректно.
+
+### 1. Зайти на сервер
+
+На своем компьютере:
+
+```bash
+ssh root@SERVER_IP
+```
+
+### 2. Проверить Ubuntu
+
+На сервере:
+
+```bash
+cat /etc/os-release
+```
+
+Скрипт по умолчанию ожидает Ubuntu `26.04`. Если у тебя другая LTS-версия и ты осознанно продолжаешь, перед запуском деплоя добавь:
+
+```bash
+export ORCHID_ALLOW_UNSUPPORTED_UBUNTU=1
+```
+
+### 3. Поставить минимальные пакеты для скачивания проекта
+
+```bash
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl git
+```
+
+### 4. Указать домен и репозиторий
+
+Замени `orchid.example.com` и `owner@example.com` на свои значения. DNS A-запись домена должна уже смотреть на IP сервера.
+
+```bash
+export ORCHID_DOMAIN=orchid.example.com
+export ORCHID_CERTBOT_EMAIL=owner@example.com
+export ORCHID_ENABLE_LETSENCRYPT=1
+export ORCHID_REPO_URL=https://github.com/junktownband/orchid-orders-vibe-app.git
+export ORCHID_REPO_REF=main
+```
+
+Если домен еще не готов, не включай Let's Encrypt на первом прогоне:
+
+```bash
+export ORCHID_ENABLE_LETSENCRYPT=0
+```
+
+После настройки DNS повтори деплой с `ORCHID_ENABLE_LETSENCRYPT=1`.
+
+### 5. Скачать проект
+
+```bash
+git clone --branch "$ORCHID_REPO_REF" "$ORCHID_REPO_URL" /root/orchid-orders-vibe-app
+cd /root/orchid-orders-vibe-app
+```
+
+Если папка уже существует после прошлой попытки:
+
+```bash
+cd /root/orchid-orders-vibe-app
+git fetch origin "$ORCHID_REPO_REF"
+git checkout "$ORCHID_REPO_REF"
+git reset --hard "origin/$ORCHID_REPO_REF"
+```
+
+### 6. Запустить деплой
+
+Запускай именно от `root`, без `sudo`.
+
+```bash
+bash scripts/deploy-ubuntu-lts.sh
+```
+
+Скрипт по шагам сделает:
+
+- установку `nginx`, `postgresql`, `sudo`, `ufw`, Node.js 22, Corepack и PM2;
+- создание пользователя `orchid`;
+- копирование проекта в `/opt/orchid-control`;
+- создание PostgreSQL базы и пользователя;
+- генерацию `DATABASE_URL`, JWT-секретов и initial seed password;
+- `pnpm install`, `db:generate`, `typecheck`, `test`, `build`;
+- `prisma migrate deploy` и production seed;
+- запуск API через PM2;
+- настройку nginx, firewall и Let's Encrypt, если он включен.
+
+### 7. Проверить сервисы
+
+```bash
+systemctl status nginx --no-pager
+systemctl status postgresql --no-pager
+sudo -u orchid -H pm2 status
+```
+
+Проверить health endpoint:
+
+```bash
+curl -fsS "https://${ORCHID_DOMAIN}/health"
+```
+
+Если Let's Encrypt еще не включен:
+
+```bash
+curl -fsS "http://${ORCHID_DOMAIN}/health"
+```
+
+### 8. Получить пароль первого входа
+
+```bash
+cat /etc/orchid-control/initial-admin-password.txt
+```
+
+Первый пользователь:
+
+- email: `sasha@orchid.local`
+- password: значение из `/etc/orchid-control/initial-admin-password.txt`
+
+После первого входа сохрани пароль в менеджере паролей. Файл с паролем на сервере доступен только `root` и группе приложения, но его все равно лучше считать временным секретом.
+
+### 9. Логи и перезапуск
+
+```bash
+sudo -u orchid -H pm2 logs orchid-api
+```
+
+```bash
+sudo -u orchid -H pm2 restart orchid-api --update-env
+```
+
+```bash
+nginx -t
+systemctl reload nginx
+```
+
+### 10. Повторный деплой после новых коммитов
+
+```bash
+ssh root@SERVER_IP
+cd /root/orchid-orders-vibe-app
+git fetch origin main
+git checkout main
+git reset --hard origin/main
+export ORCHID_DOMAIN=orchid.example.com
+export ORCHID_CERTBOT_EMAIL=owner@example.com
+export ORCHID_ENABLE_LETSENCRYPT=1
+export ORCHID_REPO_URL=https://github.com/junktownband/orchid-orders-vibe-app.git
+export ORCHID_REPO_REF=main
+bash scripts/deploy-ubuntu-lts.sh
+```
+
+Не запускай `corepack pnpm dev`, `db:seed:demo` или ручной PM2 от `root` на production-сервере.
+
 ## Правила Безопасного Запуска
 
 1. Не коммитьте `.env`: файл уже добавлен в `.gitignore`.
@@ -19,7 +178,9 @@ Local-first B2B SaaS для управления ремонтной мастер
 5. В production API должен слушать `127.0.0.1` за nginx/reverse proxy, а наружу должны быть открыты только HTTP/HTTPS.
 6. После первого входа сохраните seed-пароль в менеджере паролей и удалите локальный файл `.orchid-initial-password.txt`.
 
-## Требования
+## Локальные Требования Для Windows
+
+Этот раздел нужен только для локального запуска на Windows-машине разработчика, не для Ubuntu-сервера.
 
 Установите заранее:
 
@@ -36,7 +197,7 @@ node --version
 docker --version
 ```
 
-## Первый Безопасный Запуск Локально
+## Локальный Запуск На Windows
 
 Команды ниже рассчитаны на Windows PowerShell. Выполняйте их из корня проекта одну за другой.
 
@@ -255,29 +416,6 @@ corepack pnpm pm2:restart
 ```powershell
 corepack pnpm --filter @orchid/db prisma migrate reset
 ```
-
-## Production На Ubuntu
-
-Для боевого сервера используйте подробный runbook [DEPLOY.md](DEPLOY.md). Короткий безопасный путь:
-
-```bash
-git clone https://github.com/junktownband/orchid-orders-vibe-app.git
-cd orchid-orders-vibe-app
-sudo ORCHID_DOMAIN=orchid.example.com \
-  ORCHID_ENABLE_LETSENCRYPT=1 \
-  ORCHID_CERTBOT_EMAIL=owner@example.com \
-  bash scripts/deploy-ubuntu-lts.sh
-```
-
-Скрипт сам генерирует секреты, если они не переданы, пишет production env в `/etc/orchid-control/orchid.env`, запускает API через PM2, настраивает nginx и сохраняет initial seed password в `/etc/orchid-control/initial-admin-password.txt`.
-
-Посмотреть initial password на сервере:
-
-```bash
-sudo cat /etc/orchid-control/initial-admin-password.txt
-```
-
-Никогда не запускайте `db:seed:demo` на production.
 
 ## Документация
 
