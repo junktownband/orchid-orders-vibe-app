@@ -14,9 +14,42 @@ Local-first B2B SaaS для управления ремонтной мастер
 
 Этот раздел рассчитан на чистый Ubuntu Server, где изначально есть только пользователь `root`.
 
-Важно: приложение не должно постоянно работать от `root`. Деплой-скрипт запускается от `root`, сам ставит системные пакеты, создает отдельного пользователя `orchid`, копирует приложение в `/opt/orchid-control`, пишет секреты в `/etc/orchid-control/orchid.env`, запускает API через PM2 от пользователя `orchid` и настраивает nginx.
+Важно: приложение не должно постоянно работать от `root`. Деплой-скрипт запускается от `root`, сам ставит системные пакеты, создает отдельного пользователя `orchid`, копирует приложение в `/opt/orchid-control`, пишет секреты в `/etc/orchid-control/orchid.env`, запускает API от пользователя `orchid` и настраивает nginx.
 
-Для нормального входа в приложение нужен домен с HTTPS. Без HTTPS production cookies будут помечены как `secure`, поэтому по чистому `http://IP` можно проверить `/health`, но логин в браузере может не работать корректно.
+Для нормального безопасного входа в приложение нужен домен с HTTPS. Если домена пока нет и нужно быстро открыть приложение по белому IP, используй отдельный временный скрипт ниже: он запускает сайт на `http://IP:3000`, не трогает сертификаты и специально отключает `secure` у refresh-cookie через `ORCHID_COOKIE_SECURE=false`.
+
+### Быстрый Запуск Только По IP:3000
+
+Этот вариант нужен для временного запуска без домена и HTTPS. API запускается через `systemd` как сервис `orchid-api`, nginx слушает порт `3000`, certbot и PM2 не используются.
+
+```bash
+cd /root/orchid-orders-vibe-app
+git fetch origin main
+git checkout main
+git reset --hard origin/main
+
+export ORCHID_PUBLIC_HOST=SERVER_IP
+export ORCHID_REPO_URL=https://github.com/junktownband/orchid-orders-vibe-app.git
+export ORCHID_REPO_REF=main
+
+bash scripts/deploy-ip-3000.sh
+```
+
+После успешного запуска открывай:
+
+```text
+http://SERVER_IP:3000
+```
+
+Проверки на сервере:
+
+```bash
+systemctl status orchid-api --no-pager
+systemctl status nginx --no-pager
+curl -fsS "http://127.0.0.1:3000/health"
+```
+
+Если в панели VPS есть отдельный firewall/security group, там тоже должен быть открыт входящий TCP-порт `3000`.
 
 ### 1. Зайти на сервер
 

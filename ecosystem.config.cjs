@@ -19,6 +19,7 @@ module.exports = {
         JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET,
         JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
         APP_URL: process.env.APP_URL,
+        ORCHID_COOKIE_SECURE: process.env.ORCHID_COOKIE_SECURE,
         PORT: process.env.PORT ?? "3005",
         HOST: process.env.HOST ?? "127.0.0.1"
       }

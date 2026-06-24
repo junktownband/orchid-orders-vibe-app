@@ -7,6 +7,20 @@ import { AuthError, login, me, refresh } from "./service.js";
 const refreshCookieName = "orchid_refresh";
 const refreshCookiePath = "/api/v1/auth";
 
+function isRefreshCookieSecure() {
+  const configuredValue = process.env.ORCHID_COOKIE_SECURE?.toLowerCase();
+
+  if (configuredValue === "false" || configuredValue === "0" || configuredValue === "no") {
+    return false;
+  }
+
+  if (configuredValue === "true" || configuredValue === "1" || configuredValue === "yes") {
+    return true;
+  }
+
+  return process.env.NODE_ENV === "production";
+}
+
 function sendAuthError(reply: FastifyReply, error: AuthError) {
   return reply.status(error.statusCode).send({
     error: {
@@ -26,7 +40,7 @@ export async function authRoutes(app: FastifyInstance) {
       reply.setCookie(refreshCookieName, result.refreshToken, {
         httpOnly: true,
         sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
+        secure: isRefreshCookieSecure(),
         path: refreshCookiePath,
         maxAge: 60 * 60 * 24 * 30
       });
@@ -51,7 +65,7 @@ export async function authRoutes(app: FastifyInstance) {
       reply.setCookie(refreshCookieName, result.refreshToken, {
         httpOnly: true,
         sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
+        secure: isRefreshCookieSecure(),
         path: refreshCookiePath,
         maxAge: 60 * 60 * 24 * 30
       });
