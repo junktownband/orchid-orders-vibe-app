@@ -7,7 +7,7 @@ import { request } from "../../app/app-core";
 import { Background, PrimaryButton, TextField } from "../../app/ui";
 
 export function LoginScreen({ onLogin }: { onLogin: (response: AuthResponse) => void }) {
-  const [email, setEmail] = useState("sasha@orchid.local");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);

@@ -40,7 +40,7 @@ describe("App", () => {
     render(<App />);
 
     expect(await screen.findByRole("button", { name: "Войти" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Email")).toHaveValue("sasha@orchid.local");
+    expect(screen.getByLabelText("Email")).toHaveValue("");
   });
 
   it("clears a stale stored session when refresh and validation fail", async () => {
