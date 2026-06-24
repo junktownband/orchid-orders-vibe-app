@@ -6,5 +6,5 @@ output/
 vault/
 .DS_Store
 *.log
+.orchid-initial-password.txt
 apps/web/.vite
-packages/db/prisma/migrations
