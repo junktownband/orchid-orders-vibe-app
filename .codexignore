@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+pnpm-lock.yaml
+apps/web/dist/
+apps/api/dist/
+packages/*/dist/
+*.log
+.env
+vault/

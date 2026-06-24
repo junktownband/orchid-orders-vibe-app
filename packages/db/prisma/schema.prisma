@@ -1,0 +1,408 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MANAGER
+  MASTER
+}
+
+enum RepairStatus {
+  ACCEPTED
+  IN_PROGRESS
+  READY
+  ISSUED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  VOIDED
+}
+
+enum ExpenseStatus {
+  DRAFT
+  CONFIRMED
+  VOIDED
+}
+
+enum ExpenseKind {
+  REGULAR
+  TAX
+  SALARY
+}
+
+enum ServiceType {
+  SERVICE
+  MATERIAL
+  STRINGS
+  PART
+  OTHER
+}
+
+enum TaxMode {
+  NONE
+  SELF_EMPLOYED
+}
+
+enum TaxSubject {
+  INDIVIDUAL
+  BUSINESS
+}
+
+enum CommissionPayoutStatus {
+  UNPAID
+  PAID
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  VOID
+  CONFIRM
+  LOGIN
+  STATUS_CHANGE
+  PAYMENT_ADDED
+  PAYMENT_VOIDED
+  ISSUE
+  COMMISSION_PAID
+  COMMISSION_OVERRIDE
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  currency  String   @default("RUB")
+  timezone  String   @default("Asia/Yekaterinburg")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditLogs           AuditLog[]
+  customers           Customer[]
+  expenseCategories   ExpenseCategory[]
+  expenses            Expense[]
+  instruments         Instrument[]
+  memberships         Membership[]
+  paymentMethods      PaymentMethod[]
+  payments            Payment[]
+  repairOrders        RepairOrder[]
+  repairOrderItems    RepairOrderItem[]
+  serviceCatalogItems ServiceCatalogItem[]
+  settings            OrganizationSetting?
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  phone        String?
+  avatarUrl    String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  acceptedPayments Payment[]         @relation("PaymentAcceptedBy")
+  auditLogs        AuditLog[]
+  createdExpenses  Expense[]         @relation("ExpenseCreatedBy")
+  memberships      Membership[]
+  paidCommissions  RepairOrderItem[] @relation("RepairOrderItemCommissionPaidBy")
+  paidRepairOrders RepairOrder[]     @relation("RepairOrderPaidBy")
+}
+
+model Membership {
+  id                String   @id @default(cuid())
+  organizationId    String
+  userId            String
+  role              Role
+  commissionPercent Decimal? @db.Decimal(5, 4)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repairOrderItems RepairOrderItem[] @relation("RepairOrderItemAssignedMaster")
+  repairOrders     RepairOrder[]     @relation("RepairAssignedMaster")
+
+  @@unique([organizationId, userId])
+  @@index([organizationId, role])
+}
+
+model Customer {
+  id              String    @id @default(cuid())
+  organizationId  String
+  name            String
+  phone           String?
+  phoneNormalized String?
+  email           String?
+  note            String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  instruments  Instrument[]
+  repairOrders RepairOrder[]
+
+  @@index([organizationId, name])
+  @@index([organizationId, phone])
+  @@index([organizationId, phoneNormalized])
+}
+
+model Instrument {
+  id             String    @id @default(cuid())
+  organizationId String
+  customerId     String?
+  type           String    @default("guitar")
+  brand          String?
+  model          String?
+  serialNumber   String?
+  note           String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  customer     Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  repairOrders RepairOrder[]
+
+  @@index([organizationId, brand, model])
+}
+
+model RepairOrder {
+  id                         String        @id @default(cuid())
+  organizationId             String
+  orderNumber                String
+  customerId                 String?
+  instrumentId               String?
+  assignedMasterMembershipId String?
+  title                      String?
+  description                String
+  totalAmountCents           Int
+  totalCostCents             Int           @default(0)
+  grossProfitCents           Int           @default(0)
+  actualCommissionCents      Int?
+  repairStatus               RepairStatus  @default(ACCEPTED)
+  paymentStatus              PaymentStatus @default(UNPAID)
+  paidAt                     DateTime?
+  paidByUserId               String?
+  acceptedAt                 DateTime?
+  completedAt                DateTime?
+  issuedAt                   DateTime?
+  cancelledAt                DateTime?
+  taxModeSnapshot            TaxMode?
+  taxSubject                 TaxSubject?
+  taxRateBps                 Int?
+  taxAmountCents             Int?
+  comment                    String?
+  createdAt                  DateTime      @default(now())
+  updatedAt                  DateTime      @updatedAt
+  deletedAt                  DateTime?
+
+  assignedMaster Membership?       @relation("RepairAssignedMaster", fields: [assignedMasterMembershipId], references: [id], onDelete: SetNull)
+  customer       Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  expenses       Expense[]
+  instrument     Instrument?       @relation(fields: [instrumentId], references: [id], onDelete: SetNull)
+  lineItems      RepairOrderItem[]
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  paidBy         User?             @relation("RepairOrderPaidBy", fields: [paidByUserId], references: [id], onDelete: SetNull)
+  payments       Payment[]
+
+  @@unique([organizationId, orderNumber])
+  @@index([organizationId, repairStatus])
+  @@index([organizationId, paymentStatus])
+  @@index([organizationId, paidAt])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, repairStatus, updatedAt, id])
+}
+
+model ServiceCatalogItem {
+  id                String      @id @default(cuid())
+  organizationId    String
+  name              String
+  type              ServiceType @default(SERVICE)
+  defaultPriceCents Int
+  defaultCostCents  Int         @default(0)
+  isActive          Boolean     @default(true)
+  sortOrder         Int         @default(100)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  deletedAt         DateTime?
+
+  lineItems    RepairOrderItem[]
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name])
+  @@index([organizationId, type])
+  @@index([organizationId, isActive])
+}
+
+model RepairOrderItem {
+  id                         String                 @id @default(cuid())
+  organizationId             String
+  repairOrderId              String
+  serviceCatalogItemId       String?
+  assignedMasterMembershipId String?
+  nameSnapshot               String
+  type                       ServiceType            @default(SERVICE)
+  priceCents                 Int
+  costCents                  Int                    @default(0)
+  commissionPercentSnapshot  Decimal?               @db.Decimal(5, 4)
+  commissionBaseCents        Int?
+  commissionAmountCents      Int?
+  commissionCalculatedAt     DateTime?
+  commissionPayoutStatus     CommissionPayoutStatus @default(UNPAID)
+  commissionPaidAt           DateTime?
+  commissionPaidByUserId     String?
+  createdAt                  DateTime               @default(now())
+  updatedAt                  DateTime               @updatedAt
+
+  expenses         Expense[]
+  assignedMaster   Membership?         @relation("RepairOrderItemAssignedMaster", fields: [assignedMasterMembershipId], references: [id], onDelete: SetNull)
+  commissionPaidBy User?               @relation("RepairOrderItemCommissionPaidBy", fields: [commissionPaidByUserId], references: [id], onDelete: SetNull)
+  organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  repairOrder      RepairOrder         @relation(fields: [repairOrderId], references: [id], onDelete: Cascade)
+  serviceItem      ServiceCatalogItem? @relation(fields: [serviceCatalogItemId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, repairOrderId])
+  @@index([organizationId, assignedMasterMembershipId])
+  @@index([organizationId, commissionPayoutStatus])
+  @@index([organizationId, serviceCatalogItemId])
+  @@index([organizationId, type])
+}
+
+model Payment {
+  id               String    @id @default(cuid())
+  organizationId   String
+  repairOrderId    String
+  acceptedByUserId String?
+  paymentMethodId  String?
+  amountCents      Int
+  paidAt           DateTime
+  comment          String?
+  isVoided         Boolean   @default(false)
+  voidReason       String?
+  voidedAt         DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  acceptedBy    User?          @relation("PaymentAcceptedBy", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  paymentMethod PaymentMethod? @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
+  repairOrder   RepairOrder    @relation(fields: [repairOrderId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, paidAt])
+  @@index([repairOrderId])
+}
+
+model Expense {
+  id                String        @id @default(cuid())
+  organizationId    String
+  categoryId        String?
+  createdByUserId   String?
+  repairOrderId     String?
+  repairOrderItemId String?
+  paymentMethodId   String?
+  amountCents       Int
+  spentAt           DateTime
+  spentByName       String?
+  description       String
+  kind              ExpenseKind   @default(REGULAR)
+  status            ExpenseStatus @default(DRAFT)
+  comment           String?
+  confirmedAt       DateTime?
+  voidedAt          DateTime?
+  voidReason        String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  category        ExpenseCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdBy       User?            @relation("ExpenseCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  paymentMethod   PaymentMethod?   @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
+  repairOrderItem RepairOrderItem? @relation(fields: [repairOrderItemId], references: [id], onDelete: SetNull)
+  repairOrder     RepairOrder?     @relation(fields: [repairOrderId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, spentAt])
+  @@index([organizationId, kind])
+  @@index([organizationId, status])
+  @@index([organizationId, repairOrderId])
+  @@index([organizationId, repairOrderItemId])
+}
+
+model PaymentMethod {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(100)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  expenses     Expense[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  payments     Payment[]
+
+  @@unique([organizationId, name])
+}
+
+model ExpenseCategory {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  color          String?
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(100)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  expenses     Expense[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name])
+}
+
+model OrganizationSetting {
+  id                            String   @id @default(cuid())
+  organizationId                String   @unique
+  allowOverpayment              Boolean  @default(false)
+  countDraftExpensesInAnalytics Boolean  @default(false)
+  defaultRepairWarrantyDays     Int      @default(0)
+  taxMode                       TaxMode  @default(NONE)
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id             String      @id @default(cuid())
+  organizationId String
+  userId         String?
+  entityType     String
+  entityId       String
+  action         AuditAction
+  beforeJson     Json?
+  afterJson      Json?
+  comment        String?
+  ip             String?
+  userAgent      String?
+  createdAt      DateTime    @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, entityType, entityId])
+  @@index([organizationId, createdAt])
+}

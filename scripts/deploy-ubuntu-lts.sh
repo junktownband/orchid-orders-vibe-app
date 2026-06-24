@@ -1,0 +1,443 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+SUPPORTED_UBUNTU_VERSION="${SUPPORTED_UBUNTU_VERSION:-26.04}"
+APP_USER="${ORCHID_APP_USER:-orchid}"
+APP_DIR="${ORCHID_APP_DIR:-/opt/orchid-control}"
+ENV_DIR="${ORCHID_ENV_DIR:-/etc/orchid-control}"
+ENV_FILE="${ORCHID_ENV_FILE:-$ENV_DIR/orchid.env}"
+INITIAL_PASSWORD_FILE="${ORCHID_INITIAL_PASSWORD_FILE:-$ENV_DIR/initial-admin-password.txt}"
+DOMAIN="${ORCHID_DOMAIN:-}"
+REPO_URL="${ORCHID_REPO_URL:-}"
+REPO_REF="${ORCHID_REPO_REF:-main}"
+INPUT_DB_NAME="${ORCHID_DB_NAME:-}"
+INPUT_DB_USER="${ORCHID_DB_USER:-}"
+INPUT_DB_PASSWORD="${ORCHID_DB_PASSWORD:-}"
+INPUT_JWT_ACCESS_SECRET="${JWT_ACCESS_SECRET:-}"
+INPUT_JWT_REFRESH_SECRET="${JWT_REFRESH_SECRET:-}"
+INPUT_SEED_PASSWORD="${ORCHID_SEED_PASSWORD:-}"
+DB_NAME="${INPUT_DB_NAME:-orchid_control}"
+DB_USER="${INPUT_DB_USER:-orchid}"
+DB_PASSWORD="$INPUT_DB_PASSWORD"
+JWT_ACCESS_SECRET="$INPUT_JWT_ACCESS_SECRET"
+JWT_REFRESH_SECRET="$INPUT_JWT_REFRESH_SECRET"
+SEED_PASSWORD="$INPUT_SEED_PASSWORD"
+ENABLE_LETSENCRYPT="${ORCHID_ENABLE_LETSENCRYPT:-0}"
+CERTBOT_EMAIL="${ORCHID_CERTBOT_EMAIL:-}"
+NODE_MAJOR="${NODE_MAJOR:-22}"
+
+log() {
+  printf '\n==> %s\n' "$*"
+}
+
+fail() {
+  printf 'ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+random_alnum() {
+  local length="${1:-40}"
+  local bytes=$(((length + 1) / 2))
+  local value
+  value="$(openssl rand -hex "$bytes")"
+  printf '%s' "${value:0:length}"
+}
+
+random_hex() {
+  openssl rand -hex "${1:-32}"
+}
+
+require_root() {
+  if [[ "${EUID}" -ne 0 ]]; then
+    fail "Run as root: sudo -E bash scripts/deploy-ubuntu-lts.sh"
+  fi
+}
+
+require_domain() {
+  if [[ -z "$DOMAIN" ]]; then
+    fail "Set ORCHID_DOMAIN, for example: ORCHID_DOMAIN=orchid.example.com"
+  fi
+}
+
+load_existing_env() {
+  if [[ ! -f "$ENV_FILE" ]]; then
+    return
+  fi
+
+  log "Loading existing environment from $ENV_FILE"
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
+
+  DB_NAME="${INPUT_DB_NAME:-${ORCHID_DB_NAME:-$DB_NAME}}"
+  DB_USER="${INPUT_DB_USER:-${ORCHID_DB_USER:-$DB_USER}}"
+  DB_PASSWORD="${INPUT_DB_PASSWORD:-${ORCHID_DB_PASSWORD:-$DB_PASSWORD}}"
+
+  if [[ -z "$DB_PASSWORD" && "${DATABASE_URL:-}" =~ ^postgresql://[^:]+:([^@]+)@ ]]; then
+    DB_PASSWORD="${BASH_REMATCH[1]}"
+  fi
+
+  JWT_ACCESS_SECRET="${INPUT_JWT_ACCESS_SECRET:-${JWT_ACCESS_SECRET:-}}"
+  JWT_REFRESH_SECRET="${INPUT_JWT_REFRESH_SECRET:-${JWT_REFRESH_SECRET:-}}"
+  SEED_PASSWORD="${INPUT_SEED_PASSWORD:-${ORCHID_SEED_PASSWORD:-}}"
+}
+
+validate_configuration() {
+  if [[ -z "$APP_DIR" || "$APP_DIR" == "/" || "$APP_DIR" == "/opt" ]]; then
+    fail "Unsafe ORCHID_APP_DIR: $APP_DIR"
+  fi
+
+  if [[ ! "$APP_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+    fail "ORCHID_APP_USER must be a safe Linux user name."
+  fi
+
+  if [[ ! "$DB_NAME" =~ ^[A-Za-z0-9_]+$ ]]; then
+    fail "ORCHID_DB_NAME may contain only letters, numbers, and underscore."
+  fi
+
+  if [[ ! "$DB_USER" =~ ^[A-Za-z0-9_]+$ ]]; then
+    fail "ORCHID_DB_USER may contain only letters, numbers, and underscore."
+  fi
+
+  if [[ ! "$DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]; then
+    fail "ORCHID_DOMAIN must be a plain domain name without protocol or path."
+  fi
+
+  for secret_name in DB_PASSWORD JWT_ACCESS_SECRET JWT_REFRESH_SECRET SEED_PASSWORD; do
+    local secret_value="${!secret_name}"
+    if [[ -n "$secret_value" && ! "$secret_value" =~ ^[A-Za-z0-9._~-]+$ ]]; then
+      fail "$secret_name may contain only letters, numbers, dot, underscore, tilde, and hyphen. Leave it empty to auto-generate a safe value."
+    fi
+  done
+}
+
+check_ubuntu() {
+  if [[ ! -r /etc/os-release ]]; then
+    fail "/etc/os-release was not found; this script targets Ubuntu Server."
+  fi
+
+  # shellcheck disable=SC1091
+  . /etc/os-release
+
+  if [[ "${ID:-}" != "ubuntu" ]]; then
+    fail "This script targets Ubuntu. Detected ID=${ID:-unknown}."
+  fi
+
+  if [[ "${VERSION_ID:-}" != "$SUPPORTED_UBUNTU_VERSION" && "${ORCHID_ALLOW_UNSUPPORTED_UBUNTU:-0}" != "1" ]]; then
+    fail "This script targets Ubuntu $SUPPORTED_UBUNTU_VERSION LTS. Detected ${VERSION_ID:-unknown}. Set ORCHID_ALLOW_UNSUPPORTED_UBUNTU=1 to continue anyway."
+  fi
+}
+
+install_system_packages() {
+  log "Installing system packages"
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    ca-certificates \
+    curl \
+    git \
+    gnupg \
+    nginx \
+    openssl \
+    postgresql \
+    postgresql-contrib \
+    rsync \
+    sudo \
+    ufw
+}
+
+install_node() {
+  log "Installing Node.js ${NODE_MAJOR}.x and PM2"
+  if ! command -v node >/dev/null 2>&1 || [[ "$(node -p 'process.versions.node.split(".")[0]')" != "$NODE_MAJOR" ]]; then
+    curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash -
+    DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
+  fi
+
+  if ! command -v corepack >/dev/null 2>&1; then
+    npm install -g corepack
+  fi
+
+  corepack enable
+  npm install -g pm2@5.4.3
+}
+
+ensure_app_user() {
+  log "Ensuring application user"
+  if ! id -u "$APP_USER" >/dev/null 2>&1; then
+    useradd --system --create-home --home-dir "/var/lib/$APP_USER" --shell /bin/bash "$APP_USER"
+  fi
+}
+
+sync_application() {
+  log "Preparing application directory at $APP_DIR"
+  install -d -m 0755 "$APP_DIR"
+
+  if [[ -n "$REPO_URL" ]]; then
+    if [[ -d "$APP_DIR/.git" ]]; then
+      git -C "$APP_DIR" fetch --prune origin "$REPO_REF"
+      git -C "$APP_DIR" checkout "$REPO_REF"
+      git -C "$APP_DIR" reset --hard "origin/$REPO_REF"
+    else
+      rm -rf "$APP_DIR"
+      git clone --branch "$REPO_REF" "$REPO_URL" "$APP_DIR"
+    fi
+  else
+    local source_dir
+    source_dir="$(pwd)"
+
+    if [[ ! -f "$source_dir/package.json" ]]; then
+      fail "Run from the Orchid repository root or set ORCHID_REPO_URL."
+    fi
+
+    if [[ "$(realpath "$source_dir")" != "$(realpath "$APP_DIR")" ]]; then
+      rsync -a --delete \
+        --exclude '.git/' \
+        --exclude 'node_modules/' \
+        --exclude 'apps/*/dist/' \
+        --exclude 'packages/*/dist/' \
+        --exclude 'output/' \
+        "$source_dir/" "$APP_DIR/"
+    fi
+  fi
+
+  chown -R "$APP_USER:$APP_USER" "$APP_DIR"
+}
+
+configure_postgres() {
+  log "Configuring PostgreSQL database"
+  systemctl enable --now postgresql
+
+  DB_PASSWORD="${DB_PASSWORD:-$(random_alnum 40)}"
+
+  local role_exists
+  role_exists="$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'")"
+  if [[ "$role_exists" != "1" ]]; then
+    sudo -u postgres psql -c "CREATE USER \"${DB_USER}\" WITH PASSWORD '${DB_PASSWORD}';"
+  else
+    sudo -u postgres psql -c "ALTER USER \"${DB_USER}\" WITH PASSWORD '${DB_PASSWORD}';"
+  fi
+
+  local db_exists
+  db_exists="$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'")"
+  if [[ "$db_exists" != "1" ]]; then
+    sudo -u postgres createdb -O "$DB_USER" "$DB_NAME"
+  fi
+}
+
+write_env_file() {
+  log "Writing production environment"
+  install -d -m 0750 -o root -g "$APP_USER" "$ENV_DIR"
+
+  JWT_ACCESS_SECRET="${JWT_ACCESS_SECRET:-$(random_hex 32)}"
+  JWT_REFRESH_SECRET="${JWT_REFRESH_SECRET:-$(random_hex 32)}"
+
+  if [[ -z "$SEED_PASSWORD" ]]; then
+    SEED_PASSWORD="$(random_alnum 24)"
+    printf '%s\n' "$SEED_PASSWORD" > "$INITIAL_PASSWORD_FILE"
+    chown root:"$APP_USER" "$INITIAL_PASSWORD_FILE"
+    chmod 0640 "$INITIAL_PASSWORD_FILE"
+  fi
+
+  cat > "$ENV_FILE" <<EOF
+NODE_ENV=production
+ORCHID_DB_NAME=${DB_NAME}
+ORCHID_DB_USER=${DB_USER}
+ORCHID_DB_PASSWORD=${DB_PASSWORD}
+DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@127.0.0.1:5432/${DB_NAME}?schema=public
+JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+APP_URL=https://${DOMAIN}
+API_URL=https://${DOMAIN}/api
+VITE_API_URL=
+ORCHID_SEED_PASSWORD=${SEED_PASSWORD}
+PORT=3005
+HOST=127.0.0.1
+EOF
+
+  chown root:"$APP_USER" "$ENV_FILE"
+  chmod 0640 "$ENV_FILE"
+}
+
+run_as_app_user() {
+  sudo -u "$APP_USER" -H bash -lc "$*"
+}
+
+install_and_build_application() {
+  log "Installing dependencies and building application"
+  run_as_app_user "cd '$APP_DIR' && corepack enable && corepack prepare pnpm@9.15.4 --activate"
+  run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && corepack pnpm install --frozen-lockfile"
+  run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && corepack pnpm db:generate"
+
+  if [[ "${ORCHID_SKIP_VERIFY:-0}" != "1" ]]; then
+    run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && corepack pnpm -r typecheck"
+    run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && corepack pnpm -r test"
+  fi
+
+  run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && corepack pnpm -r build"
+  run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && corepack pnpm --filter @orchid/db prisma migrate deploy"
+  run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && corepack pnpm db:seed"
+}
+
+configure_pm2() {
+  log "Starting API with PM2"
+  run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && pm2 startOrReload ecosystem.config.cjs --only orchid-api --update-env"
+  run_as_app_user "pm2 save"
+
+  env PATH="$PATH:/usr/bin" pm2 startup systemd -u "$APP_USER" --hp "/var/lib/$APP_USER" >/tmp/orchid-pm2-startup.txt
+  systemctl enable "pm2-$APP_USER" >/dev/null 2>&1 || true
+}
+
+configure_nginx() {
+  log "Configuring nginx"
+  local cert_dir="/etc/letsencrypt/live/${DOMAIN}"
+
+  if [[ -f "$cert_dir/fullchain.pem" && -f "$cert_dir/privkey.pem" ]]; then
+    cat > /etc/nginx/sites-available/orchid-control <<EOF
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name ${DOMAIN};
+
+    ssl_certificate ${cert_dir}/fullchain.pem;
+    ssl_certificate_key ${cert_dir}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+
+    root ${APP_DIR}/apps/web/dist;
+    index index.html;
+
+    client_max_body_size 10m;
+
+    location /health {
+        proxy_pass http://127.0.0.1:3005/health;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:3005/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+}
+EOF
+  else
+    cat > /etc/nginx/sites-available/orchid-control <<EOF
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN};
+
+    root ${APP_DIR}/apps/web/dist;
+    index index.html;
+
+    client_max_body_size 10m;
+
+    location /health {
+        proxy_pass http://127.0.0.1:3005/health;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:3005/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+}
+EOF
+  fi
+
+  ln -sfn /etc/nginx/sites-available/orchid-control /etc/nginx/sites-enabled/orchid-control
+  rm -f /etc/nginx/sites-enabled/default
+  nginx -t
+  systemctl enable --now nginx
+  systemctl reload nginx
+}
+
+configure_firewall() {
+  log "Configuring firewall"
+  ufw allow OpenSSH
+  ufw allow 'Nginx Full'
+  ufw --force enable
+}
+
+configure_letsencrypt() {
+  if [[ "$ENABLE_LETSENCRYPT" != "1" ]]; then
+    return
+  fi
+
+  if [[ -z "$CERTBOT_EMAIL" ]]; then
+    fail "Set ORCHID_CERTBOT_EMAIL when ORCHID_ENABLE_LETSENCRYPT=1."
+  fi
+
+  log "Configuring Let's Encrypt certificate"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y certbot python3-certbot-nginx
+  certbot --nginx \
+    --non-interactive \
+    --agree-tos \
+    --redirect \
+    --email "$CERTBOT_EMAIL" \
+    -d "$DOMAIN"
+}
+
+print_summary() {
+  log "Deployment complete"
+  printf 'Application URL: https://%s\n' "$DOMAIN"
+  printf 'Health check:    https://%s/health\n' "$DOMAIN"
+  printf 'Environment:     %s\n' "$ENV_FILE"
+  if [[ -f "$INITIAL_PASSWORD_FILE" ]]; then
+    printf 'Initial password: %s\n' "$INITIAL_PASSWORD_FILE"
+  fi
+  printf '\nUseful checks:\n'
+  printf '  sudo -u %s -H pm2 status\n' "$APP_USER"
+  printf '  sudo -u %s -H pm2 logs orchid-api\n' "$APP_USER"
+  printf '  curl -fsS https://%s/health\n' "$DOMAIN"
+}
+
+main() {
+  require_root
+  require_domain
+  check_ubuntu
+  load_existing_env
+  validate_configuration
+  install_system_packages
+  install_node
+  ensure_app_user
+  sync_application
+  configure_postgres
+  write_env_file
+  install_and_build_application
+  configure_pm2
+  configure_nginx
+  configure_firewall
+  configure_letsencrypt
+  print_summary
+}
+
+main "$@"

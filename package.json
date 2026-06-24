@@ -1,0 +1,33 @@
+{
+  "name": "orchid-control",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "type": "module",
+  "scripts": {
+    "dev": "corepack pnpm -r --parallel dev",
+    "build": "corepack pnpm -r build",
+    "lint": "corepack pnpm -r lint",
+    "typecheck": "corepack pnpm -r typecheck",
+    "test": "corepack pnpm -r test",
+    "db:generate": "corepack pnpm --filter @orchid/db prisma generate",
+    "db:migrate": "corepack pnpm --filter @orchid/db prisma migrate dev",
+    "db:seed": "corepack pnpm --filter @orchid/db prisma db seed",
+    "db:seed:demo": "corepack pnpm --filter @orchid/db prisma db seed -- --demo",
+    "db:studio": "corepack pnpm --filter @orchid/db prisma studio",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop ecosystem.config.cjs",
+    "pm2:restart": "pm2 restart ecosystem.config.cjs",
+    "pm2:logs": "pm2 logs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.16.0",
+    "eslint": "^9.16.0",
+    "eslint-config-prettier": "^9.1.0",
+    "globals": "^15.13.0",
+    "pm2": "^5.4.3",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0"
+  }
+}

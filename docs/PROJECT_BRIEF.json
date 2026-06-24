@@ -1,0 +1,41 @@
+{
+  "name": "Orchid Control",
+  "type": "local-first mobile-first B2B SaaS-style workshop accounting app",
+  "language": "ru",
+  "stack": [
+    "Node.js",
+    "TypeScript",
+    "Fastify",
+    "Prisma",
+    "PostgreSQL",
+    "React",
+    "Vite",
+    "Tailwind",
+    "TanStack Query",
+    "React Hook Form",
+    "Zod"
+  ],
+  "hard_constraints": [
+    "No Google Sheets",
+    "No Google Forms",
+    "No Apps Script",
+    "No Google Drive as business data store",
+    "PostgreSQL is source of truth",
+    "All money as integer cents",
+    "Backend owns business logic",
+    "Mobile-first UI"
+  ],
+  "core_modules": [
+    "auth",
+    "rbac",
+    "settings",
+    "customers",
+    "instruments",
+    "repair_orders",
+    "payments",
+    "expenses",
+    "analytics",
+    "audit"
+  ],
+  "design_style": "restrained dark operational SaaS UI with compact panels, clear focus states, and limited accent color"
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@orchid/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo config package has no dev server",
+    "build": "echo config package has no build",
+    "lint": "echo config package has no lintable source",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
+  }
+}
