@@ -176,6 +176,7 @@ sudo apt-get install -y ca-certificates curl git gnupg nginx openssl postgresql 
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash -
 sudo apt-get install -y nodejs
 sudo corepack enable
+sudo corepack prepare pnpm@9.15.4 --activate
 sudo npm install -g pm2@5.4.3
 ```
 
@@ -244,7 +245,7 @@ HOST=127.0.0.1
 ### 6. Установка, проверка и сборка
 
 ```bash
-sudo -u orchid -H bash -lc "cd /opt/orchid-control && corepack enable"
+sudo -u orchid -H bash -lc "cd /opt/orchid-control && corepack pnpm --version"
 sudo -u orchid -H bash -lc "cd /opt/orchid-control && corepack pnpm install --frozen-lockfile"
 sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orchid-control/orchid.env && set +a && corepack pnpm db:generate"
 sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orchid-control/orchid.env && set +a && corepack pnpm -r typecheck"

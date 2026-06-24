@@ -156,6 +156,7 @@ install_node() {
   fi
 
   corepack enable
+  corepack prepare pnpm@9.15.4 --activate
   npm install -g pm2@5.4.3
 }
 
@@ -262,7 +263,7 @@ run_as_app_user() {
 
 install_and_build_application() {
   log "Installing dependencies and building application"
-  run_as_app_user "cd '$APP_DIR' && corepack enable && corepack prepare pnpm@9.15.4 --activate"
+  run_as_app_user "cd '$APP_DIR' && corepack pnpm --version"
   run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && corepack pnpm install --frozen-lockfile"
   run_as_app_user "cd '$APP_DIR' && set -a && source '$ENV_FILE' && set +a && corepack pnpm db:generate"
 
