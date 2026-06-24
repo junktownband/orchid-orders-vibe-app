@@ -173,12 +173,14 @@ sync_application() {
 
   if [[ -n "$REPO_URL" ]]; then
     if [[ -d "$APP_DIR/.git" ]]; then
-      git -C "$APP_DIR" fetch --prune origin "$REPO_REF"
-      git -C "$APP_DIR" checkout "$REPO_REF"
-      git -C "$APP_DIR" reset --hard "origin/$REPO_REF"
+      chown -R "$APP_USER:$APP_USER" "$APP_DIR"
+      run_as_app_user "git -C '$APP_DIR' fetch --prune origin '$REPO_REF'"
+      run_as_app_user "git -C '$APP_DIR' checkout '$REPO_REF'"
+      run_as_app_user "git -C '$APP_DIR' reset --hard 'origin/$REPO_REF'"
     else
       rm -rf "$APP_DIR"
-      git clone --branch "$REPO_REF" "$REPO_URL" "$APP_DIR"
+      install -d -m 0755 -o "$APP_USER" -g "$APP_USER" "$APP_DIR"
+      run_as_app_user "git clone --branch '$REPO_REF' '$REPO_URL' '$APP_DIR'"
     fi
   else
     local source_dir
