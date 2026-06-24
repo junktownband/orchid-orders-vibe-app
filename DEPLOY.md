@@ -246,7 +246,7 @@ HOST=127.0.0.1
 
 ```bash
 sudo -u orchid -H bash -lc "cd /opt/orchid-control && corepack pnpm --version"
-sudo -u orchid -H bash -lc "cd /opt/orchid-control && corepack pnpm install --frozen-lockfile"
+sudo -u orchid -H bash -lc "cd /opt/orchid-control && corepack pnpm install --frozen-lockfile --prod=false"
 sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orchid-control/orchid.env && set +a && corepack pnpm db:generate"
 sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orchid-control/orchid.env && set +a && corepack pnpm -r typecheck"
 sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orchid-control/orchid.env && set +a && corepack pnpm -r test"
@@ -455,7 +455,7 @@ sudo ORCHID_DOMAIN=orchid.example.com \
 cd /opt/orchid-control
 sudo -u orchid -H git log --oneline -5
 sudo -u orchid -H git checkout <previous-good-sha>
-sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orchid-control/orchid.env && set +a && corepack pnpm install --frozen-lockfile && corepack pnpm -r build"
+sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orchid-control/orchid.env && set +a && corepack pnpm install --frozen-lockfile --prod=false && corepack pnpm -r build"
 sudo -u orchid -H bash -lc "cd /opt/orchid-control && set -a && source /etc/orchid-control/orchid.env && set +a && pm2 restart orchid-api --update-env"
 sudo systemctl reload nginx
 ```
