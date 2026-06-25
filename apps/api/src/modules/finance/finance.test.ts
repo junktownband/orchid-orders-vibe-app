@@ -53,6 +53,18 @@ function financeData(overrides: Record<string, unknown> = {}) {
     repairOrdersCount: 4,
     paidOrdersCount: 2,
     averagePaidTicketCents: 150_000,
+    masterCommissions: [
+      {
+        masterMembershipId: "master-1",
+        masterName: "Master",
+        accruedCents: 70_000,
+        paidCents: 30_000,
+        payableCents: 40_000,
+        accruedItemsCount: 2,
+        paidItemsCount: 1,
+        payableItemsCount: 1
+      }
+    ],
     operations: [
       {
         id: "payment-1",
@@ -128,6 +140,18 @@ describe("finance service", () => {
           id: "expense-1",
           direction: "OUT",
           signedAmountCents: -30_000
+        }
+      ],
+      masterCommissions: [
+        {
+          masterMembershipId: "master-1",
+          masterName: "Master",
+          accruedCents: 70_000,
+          paidCents: 30_000,
+          payableCents: 40_000,
+          accruedItemsCount: 2,
+          paidItemsCount: 1,
+          payableItemsCount: 1
         }
       ]
     });

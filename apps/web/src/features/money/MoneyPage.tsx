@@ -153,6 +153,8 @@ export function MoneyPage({
     }
   }
 
+  const masterCommissions = overview?.masterCommissions ?? [];
+
   return (
     <div>
       <PageToolbar
@@ -277,6 +279,50 @@ export function MoneyPage({
           </div>
         </GlassPanel>
       </div>
+
+      <GlassPanel className="mt-4 p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm text-white/48">Комиссии</p>
+            <h3 className="mt-1 text-2xl font-semibold">Мастера за период</h3>
+          </div>
+          <span className="text-sm text-white/45">{masterCommissions.length} мастеров</span>
+        </div>
+
+        <div className="mt-4 grid gap-2">
+          {isLoading ? <p className="rounded-lg bg-white/[0.07] p-4 text-white/55">Собираем комиссии...</p> : null}
+          {!isLoading && masterCommissions.length === 0 ? (
+            <p className="rounded-lg bg-white/[0.055] p-4 text-sm text-white/55 ring-1 ring-white/[0.08]">
+              За выбранный месяц комиссий по мастерам нет.
+            </p>
+          ) : null}
+          {masterCommissions.map((master) => (
+            <article
+              key={master.masterMembershipId ?? master.masterName}
+              className="grid gap-3 border-t border-white/[0.07] py-3 first:border-t-0 first:pt-0 md:grid-cols-[minmax(0,1fr)_repeat(3,minmax(110px,140px))]"
+            >
+              <div className="min-w-0">
+                <p className="truncate font-medium text-white">{master.masterName}</p>
+                <p className="mt-1 text-sm text-white/42">
+                  {master.accruedItemsCount} начислено · {master.paidItemsCount} выплачено · {master.payableItemsCount} ждут выплаты
+                </p>
+              </div>
+              <div>
+                <p className="text-xs uppercase text-white/38">Начислено</p>
+                <p className="mt-1 font-semibold tabular-nums text-white">{money(master.accruedCents)}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase text-white/38">Выплачено</p>
+                <p className="mt-1 font-semibold tabular-nums text-[rgb(var(--status-sage-text))]">{money(master.paidCents)}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase text-white/38">К выплате</p>
+                <p className="mt-1 font-semibold tabular-nums text-amber">{money(master.payableCents)}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </GlassPanel>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <InlineStat label="Валовая прибыль" value={overview ? money(overview.summary.grossProfitCents) : "..."} />

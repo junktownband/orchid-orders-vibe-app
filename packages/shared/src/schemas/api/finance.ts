@@ -61,6 +61,17 @@ export const financeOperationResponseSchema = z.object({
   comment: z.string().nullable()
 });
 
+export const financeMasterCommissionResponseSchema = z.object({
+  masterMembershipId: z.string().nullable(),
+  masterName: z.string(),
+  accruedCents: moneyCentsSchema,
+  paidCents: moneyCentsSchema,
+  payableCents: moneyCentsSchema,
+  accruedItemsCount: z.number().int().nonnegative(),
+  paidItemsCount: z.number().int().nonnegative(),
+  payableItemsCount: z.number().int().nonnegative()
+});
+
 export const financeOverviewResponseSchema = z.object({
   period: z.object({
     from: z.string(),
@@ -85,11 +96,13 @@ export const financeOverviewResponseSchema = z.object({
     paidOrdersCount: z.number().int().nonnegative(),
     averagePaidTicketCents: moneyCentsSchema
   }),
+  masterCommissions: z.array(financeMasterCommissionResponseSchema),
   operations: z.array(financeOperationResponseSchema)
 });
 
 export type FinanceOperationType = z.infer<typeof financeOperationTypeSchema>;
 export type FinanceOperationResponse = z.infer<typeof financeOperationResponseSchema>;
+export type FinanceMasterCommissionResponse = z.infer<typeof financeMasterCommissionResponseSchema>;
 export type FinanceOverviewResponse = z.infer<typeof financeOverviewResponseSchema>;
 export type FinanceQuery = z.infer<typeof financeQuerySchema>;
 export type CreateFinanceOperationInput = z.infer<typeof createFinanceOperationSchema>;

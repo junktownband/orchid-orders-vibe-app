@@ -118,6 +118,7 @@ export async function getFinanceOverview(
       paidOrdersCount: data.paidOrdersCount,
       averagePaidTicketCents: data.averagePaidTicketCents
     },
+    masterCommissions: data.masterCommissions,
     operations: data.operations.map(toOperationResponse)
   };
 }

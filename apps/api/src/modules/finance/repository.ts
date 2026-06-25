@@ -1,4 +1,5 @@
 import {
+  CommissionPayoutStatus,
   ExpenseKind,
   ExpenseStatus,
   FinanceOperationType as DbFinanceOperationType,
@@ -13,6 +14,27 @@ type Period = {
   from: Date;
   to: Date;
   limit: number;
+};
+
+type MasterCommissionItem = {
+  assignedMasterMembershipId: string | null;
+  commissionAmountCents: number | null;
+  assignedMaster: {
+    user: {
+      name: string;
+    };
+  } | null;
+};
+
+type MasterCommissionBucket = {
+  masterMembershipId: string | null;
+  masterName: string;
+  accruedCents: number;
+  paidCents: number;
+  payableCents: number;
+  accruedItemsCount: number;
+  paidItemsCount: number;
+  payableItemsCount: number;
 };
 
 function sumManualGroups(
@@ -34,6 +56,92 @@ function sumManualGroups(
   );
 }
 
+function masterCommissionKey(item: MasterCommissionItem) {
+  return item.assignedMasterMembershipId ?? "unassigned";
+}
+
+function masterCommissionName(item: MasterCommissionItem) {
+  return item.assignedMaster?.user.name ?? "Без мастера";
+}
+
+function ensureMasterCommissionBucket(
+  buckets: Map<string, MasterCommissionBucket>,
+  item: MasterCommissionItem
+) {
+  const key = masterCommissionKey(item);
+  const existing = buckets.get(key);
+
+  if (existing) {
+    return existing;
+  }
+
+  const bucket = {
+    masterMembershipId: item.assignedMasterMembershipId,
+    masterName: masterCommissionName(item),
+    accruedCents: 0,
+    paidCents: 0,
+    payableCents: 0,
+    accruedItemsCount: 0,
+    paidItemsCount: 0,
+    payableItemsCount: 0
+  };
+
+  buckets.set(key, bucket);
+
+  return bucket;
+}
+
+function addMasterCommissionAmounts(
+  buckets: Map<string, MasterCommissionBucket>,
+  items: MasterCommissionItem[],
+  amountField: "accruedCents" | "paidCents" | "payableCents",
+  countField: "accruedItemsCount" | "paidItemsCount" | "payableItemsCount"
+) {
+  for (const item of items) {
+    const bucket = ensureMasterCommissionBucket(buckets, item);
+
+    bucket[amountField] += item.commissionAmountCents ?? 0;
+    bucket[countField] += 1;
+  }
+}
+
+function buildMasterCommissionBreakdown({
+  accruedCommissionItems,
+  paidCommissionItems,
+  payableCommissionItems
+}: {
+  accruedCommissionItems: MasterCommissionItem[];
+  paidCommissionItems: MasterCommissionItem[];
+  payableCommissionItems: MasterCommissionItem[];
+}) {
+  const buckets = new Map<string, MasterCommissionBucket>();
+
+  addMasterCommissionAmounts(buckets, accruedCommissionItems, "accruedCents", "accruedItemsCount");
+  addMasterCommissionAmounts(buckets, paidCommissionItems, "paidCents", "paidItemsCount");
+  addMasterCommissionAmounts(buckets, payableCommissionItems, "payableCents", "payableItemsCount");
+
+  return [...buckets.values()].sort((left, right) => {
+    const totalRight = right.payableCents + right.accruedCents + right.paidCents;
+    const totalLeft = left.payableCents + left.accruedCents + left.paidCents;
+
+    return totalRight - totalLeft || left.masterName.localeCompare(right.masterName, "ru");
+  });
+}
+
+const masterCommissionSelect = {
+  assignedMasterMembershipId: true,
+  commissionAmountCents: true,
+  assignedMaster: {
+    select: {
+      user: {
+        select: {
+          name: true
+        }
+      }
+    }
+  }
+} satisfies Record<string, unknown>;
+
 export async function getFinanceData(organizationId: string, period: Period) {
   const [
     allPayments,
@@ -42,6 +150,7 @@ export async function getFinanceData(organizationId: string, period: Period) {
     paidOrders,
     acceptedPayments,
     confirmedExpenses,
+    accruedCommissionItems,
     paidCommissionItems,
     payableCommissionItems,
     periodManualGroups,
@@ -131,7 +240,23 @@ export async function getFinanceData(organizationId: string, period: Period) {
     prisma.repairOrderItem.findMany({
       where: {
         organizationId,
-        commissionPayoutStatus: "PAID",
+        commissionCalculatedAt: {
+          gte: period.from,
+          lte: period.to
+        },
+        commissionAmountCents: {
+          gt: 0
+        },
+        repairOrder: {
+          deletedAt: null
+        }
+      },
+      select: masterCommissionSelect
+    }),
+    prisma.repairOrderItem.findMany({
+      where: {
+        organizationId,
+        commissionPayoutStatus: CommissionPayoutStatus.PAID,
         commissionPaidAt: {
           gte: period.from,
           lte: period.to
@@ -143,14 +268,12 @@ export async function getFinanceData(organizationId: string, period: Period) {
           deletedAt: null
         }
       },
-      select: {
-        commissionAmountCents: true
-      }
+      select: masterCommissionSelect
     }),
     prisma.repairOrderItem.findMany({
       where: {
         organizationId,
-        commissionPayoutStatus: "UNPAID",
+        commissionPayoutStatus: CommissionPayoutStatus.UNPAID,
         commissionAmountCents: {
           gt: 0
         },
@@ -158,9 +281,7 @@ export async function getFinanceData(organizationId: string, period: Period) {
           deletedAt: null
         }
       },
-      select: {
-        commissionAmountCents: true
-      }
+      select: masterCommissionSelect
     }),
     prisma.financeOperation.groupBy({
       by: ["type"],
@@ -287,6 +408,11 @@ export async function getFinanceData(organizationId: string, period: Period) {
     (sum, item) => sum + (item.commissionAmountCents ?? 0),
     0
   );
+  const masterCommissions = buildMasterCommissionBreakdown({
+    accruedCommissionItems,
+    paidCommissionItems,
+    payableCommissionItems
+  });
 
   return {
     period: {
@@ -305,6 +431,7 @@ export async function getFinanceData(organizationId: string, period: Period) {
     repairOrdersCount,
     paidOrdersCount: paidOrders.length,
     averagePaidTicketCents: paidOrders.length > 0 ? Math.round(paidRevenueCents / paidOrders.length) : 0,
+    masterCommissions,
     operations: [
       ...paymentOperations.map((payment) => ({
         id: payment.id,
