@@ -364,13 +364,13 @@ export function OrdersListPage({
                 ))}
               </SelectField>
               <TextField
-                label="РЎРѕР·РґР°РЅ СЃ"
+                label="Создан с"
                 onChange={(event) => updateQuery({ createdFrom: event.target.value })}
                 type="date"
                 value={query.createdFrom}
               />
               <TextField
-                label="РЎРѕР·РґР°РЅ РїРѕ"
+                label="Создан по"
                 onChange={(event) => updateQuery({ createdTo: event.target.value })}
                 type="date"
                 value={query.createdTo}
