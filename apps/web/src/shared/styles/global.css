@@ -7,9 +7,19 @@
   --color-ink: 2 7 16;
   --color-panel: 7 17 32;
   --color-orchid: 169 190 223;
-  --color-mint: 159 207 212;
+  --color-mint: 210 190 152;
   --color-coral: 217 138 151;
   --color-amber: 214 189 139;
+  --status-mist: 143 184 216;
+  --status-mist-text: 189 214 234;
+  --status-sand: 210 190 152;
+  --status-sand-text: 229 211 178;
+  --status-honey: 213 186 131;
+  --status-honey-text: 229 205 154;
+  --status-sage: 167 199 181;
+  --status-sage-text: 194 217 205;
+  --status-rose: 201 154 161;
+  --status-rose-text: 221 178 185;
   font-family:
     Manrope,
     ui-sans-serif,
@@ -77,6 +87,137 @@ option {
 ::selection {
   background: rgb(var(--color-mint) / 0.28);
   color: #ffffff;
+}
+
+@layer components {
+  .button-glass-primary {
+    border: 1px solid rgb(var(--color-mint) / 0.24);
+    background: rgb(var(--color-mint) / 0.14);
+    color: rgb(255 255 255 / 0.92);
+    box-shadow:
+      0 10px 24px rgb(0 0 0 / 0.24),
+      inset 0 1px 0 rgb(255 255 255 / 0.14);
+    backdrop-filter: blur(22px) saturate(126%);
+    -webkit-backdrop-filter: blur(22px) saturate(126%);
+  }
+
+  .button-glass-primary:hover {
+    border-color: rgb(var(--color-mint) / 0.34);
+    background: rgb(var(--color-mint) / 0.2);
+  }
+
+  .button-glass-muted {
+    border: 1px solid rgb(255 255 255 / 0.1);
+    background: rgb(255 255 255 / 0.055);
+    color: rgb(255 255 255 / 0.84);
+    box-shadow:
+      0 8px 18px rgb(0 0 0 / 0.18),
+      inset 0 1px 0 rgb(255 255 255 / 0.1);
+    backdrop-filter: blur(20px) saturate(120%);
+    -webkit-backdrop-filter: blur(20px) saturate(120%);
+  }
+
+  .button-glass-muted:hover {
+    border-color: rgb(255 255 255 / 0.16);
+    background: rgb(255 255 255 / 0.085);
+    color: rgb(255 255 255 / 0.95);
+  }
+
+  .button-glass-active {
+    border: 1px solid rgb(var(--color-mint) / 0.22);
+    background: rgb(var(--color-mint) / 0.16);
+    color: rgb(255 255 255 / 0.94);
+    box-shadow:
+      0 8px 20px rgb(0 0 0 / 0.2),
+      inset 0 1px 0 rgb(255 255 255 / 0.12);
+    backdrop-filter: blur(20px) saturate(126%);
+    -webkit-backdrop-filter: blur(20px) saturate(126%);
+  }
+
+  .segmented-glass {
+    border: 1px solid rgb(255 255 255 / 0.08);
+    background: rgb(255 255 255 / 0.045);
+    box-shadow:
+      0 10px 24px rgb(0 0 0 / 0.18),
+      inset 0 1px 0 rgb(255 255 255 / 0.08);
+    backdrop-filter: blur(24px) saturate(122%);
+    -webkit-backdrop-filter: blur(24px) saturate(122%);
+  }
+
+  .segmented-glass-button {
+    border: 1px solid transparent;
+    background: transparent;
+    color: rgb(255 255 255 / 0.58);
+    box-shadow: none;
+  }
+
+  .segmented-glass-button:hover {
+    color: rgb(255 255 255 / 0.82);
+    background: rgb(255 255 255 / 0.045);
+  }
+
+  .segmented-glass-button-active {
+    border-color: rgb(var(--color-mint) / 0.16);
+    background: rgb(var(--color-mint) / 0.13);
+    color: rgb(255 255 255 / 0.92);
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.18),
+      inset 0 1px 0 rgb(255 255 255 / 0.1);
+  }
+
+  .status-tone-mint {
+    background: rgb(var(--color-mint) / 0.12);
+    color: rgb(var(--color-mint));
+    --tw-ring-color: rgb(var(--color-mint) / 0.25);
+  }
+
+  .status-tone-amber {
+    background: rgb(var(--color-amber) / 0.14);
+    color: rgb(var(--color-amber));
+    --tw-ring-color: rgb(var(--color-amber) / 0.25);
+  }
+
+  .status-tone-coral {
+    background: rgb(var(--color-coral) / 0.14);
+    color: rgb(var(--color-coral));
+    --tw-ring-color: rgb(var(--color-coral) / 0.25);
+  }
+
+  .status-tone-neutral {
+    background: rgb(255 255 255 / 0.08);
+    color: rgb(255 255 255 / 0.72);
+    --tw-ring-color: rgb(255 255 255 / 0.1);
+  }
+
+  .status-tone-mist {
+    background: rgb(var(--status-mist) / 0.13);
+    color: rgb(var(--status-mist-text));
+    --tw-ring-color: rgb(var(--status-mist) / 0.24);
+  }
+
+  .status-tone-sand {
+    background: rgb(var(--status-sand) / 0.14);
+    color: rgb(var(--status-sand-text));
+    --tw-ring-color: rgb(var(--status-sand) / 0.25);
+  }
+
+  .status-tone-honey {
+    background: rgb(var(--status-honey) / 0.14);
+    color: rgb(var(--status-honey-text));
+    --tw-ring-color: rgb(var(--status-honey) / 0.25);
+  }
+
+  .status-tone-sage {
+    background: rgb(var(--status-sage) / 0.13);
+    color: rgb(var(--status-sage-text));
+    --tw-ring-color: rgb(var(--status-sage) / 0.24);
+  }
+
+  .status-tone-rose {
+    background: rgb(var(--status-rose) / 0.14);
+    color: rgb(var(--status-rose-text));
+    --tw-ring-color: rgb(var(--status-rose) / 0.25);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

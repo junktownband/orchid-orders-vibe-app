@@ -10,6 +10,7 @@ import {
   memberPercentInput,
   parsePercentInput,
   percent,
+  phoneValueForApi,
   request,
   roleLabel,
   type Screen
@@ -27,7 +28,7 @@ function memberDraft(member: MemberResponse): MemberDraft {
   return {
     name: member.name,
     email: member.email,
-    phone: member.phone ?? "",
+    phone: member.phone ?? "+7",
     commissionPercent: memberPercentInput(member.commissionPercent)
   };
 }
@@ -53,7 +54,7 @@ export function MembersSettingsPage({
   const [drafts, setDrafts] = useState<Record<string, MemberDraft>>({});
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
-  const [newPhone, setNewPhone] = useState("");
+  const [newPhone, setNewPhone] = useState("+7");
   const [newCommissionPercent, setNewCommissionPercent] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -122,14 +123,14 @@ export function MembersSettingsPage({
         body: JSON.stringify({
           name: newName,
           email: newEmail,
-          phone: newPhone || undefined,
+          phone: phoneValueForApi(newPhone),
           commissionPercent
         })
       });
 
       setNewName("");
       setNewEmail("");
-      setNewPhone("");
+      setNewPhone("+7");
       setNewCommissionPercent("");
       await refreshMembers();
     } catch (requestError) {
@@ -163,7 +164,7 @@ export function MembersSettingsPage({
         body: JSON.stringify({
           name: draft.name,
           email: draft.email,
-          phone: draft.phone || null,
+          phone: phoneValueForApi(draft.phone) ?? null,
           commissionPercent: memberCommissionPercent,
           isActive
         })
@@ -217,7 +218,7 @@ export function MembersSettingsPage({
               autoComplete="tel"
               inputMode="tel"
               label="Телефон"
-              onChange={(event) => setNewPhone(formatPhoneInput(event.target.value))}
+              onChange={(event) => setNewPhone((current) => formatPhoneInput(event.target.value, current))}
               type="tel"
               value={newPhone}
             />
@@ -284,7 +285,9 @@ export function MembersSettingsPage({
                     autoComplete="tel"
                     inputMode="tel"
                     label="Телефон"
-                    onChange={(event) => updateDraft(member.id, { phone: formatPhoneInput(event.target.value) })}
+                    onChange={(event) =>
+                      updateDraft(member.id, { phone: formatPhoneInput(event.target.value, draft.phone) })
+                    }
                     type="tel"
                     value={draft.phone}
                   />

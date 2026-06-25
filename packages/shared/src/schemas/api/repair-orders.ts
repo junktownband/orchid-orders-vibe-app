@@ -77,14 +77,36 @@ export const voidRepairOrderPaymentSchema = z.object({
 
 export const repairOrderTabSchema = z.enum(["all", "ready", "active", "completed"]);
 
-export const repairOrdersQuerySchema = z.object({
-  q: z.string().trim().max(100).optional(),
-  tab: repairOrderTabSchema.default("all"),
-  repairStatus: repairStatusSchema.optional(),
-  paymentStatus: paymentStatusSchema.optional(),
-  cursor: z.string().optional(),
-  limit: z.coerce.number().int().min(1).max(50).default(20)
-});
+const dateOnlySchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((value) => {
+    const date = new Date(`${value}T00:00:00.000Z`);
+
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  }, "Invalid date");
+
+export const repairOrdersQuerySchema = z
+  .object({
+    q: z.string().trim().max(100).optional(),
+    tab: repairOrderTabSchema.default("all"),
+    repairStatus: repairStatusSchema.optional(),
+    paymentStatus: paymentStatusSchema.optional(),
+    createdFrom: dateOnlySchema.optional(),
+    createdTo: dateOnlySchema.optional(),
+    cursor: z.string().optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(20)
+  })
+  .refine(
+    (query) =>
+      !query.createdFrom ||
+      !query.createdTo ||
+      new Date(`${query.createdFrom}T00:00:00.000Z`) <= new Date(`${query.createdTo}T00:00:00.000Z`),
+    {
+      message: "Invalid date range",
+      path: ["createdTo"]
+    }
+  );
 
 export const repairOrderResponseSchema = z.object({
   id: z.string(),

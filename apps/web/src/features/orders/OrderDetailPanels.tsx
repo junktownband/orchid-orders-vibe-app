@@ -28,9 +28,12 @@ import {
   money,
   paymentStatusLabel,
   percent,
+  phoneTelHref,
+  phoneValueForApi,
   quickOrderItems,
   repairStatusLabel,
   repairStatusOptions,
+  repairStatusTone,
   request,
   resaleTypes,
   serviceTypeLabel,
@@ -118,7 +121,7 @@ export function CustomerProfilePanel({
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(order.customerName ?? "");
-  const [phone, setPhone] = useState(order.customerPhone ?? "");
+  const [phone, setPhone] = useState(order.customerPhone ?? "+7");
   const [email, setEmail] = useState(order.customerEmail ?? "");
   const [note, setNote] = useState(order.customerNote ?? "");
   const [saveState, setSaveState] = useState<AutosaveState>("saved");
@@ -127,13 +130,13 @@ export function CustomerProfilePanel({
     email: order.customerEmail ?? "",
     name: order.customerName ?? "",
     note: order.customerNote ?? "",
-    phone: order.customerPhone ?? ""
+    phone: order.customerPhone ?? "+7"
   });
   const draftSignature = JSON.stringify({ email, name, note, phone });
 
   useEffect(() => {
     setName(order.customerName ?? "");
-    setPhone(order.customerPhone ?? "");
+    setPhone(order.customerPhone ?? "+7");
     setEmail(order.customerEmail ?? "");
     setNote(order.customerNote ?? "");
     setError(null);
@@ -166,7 +169,7 @@ export function CustomerProfilePanel({
           headers: authHeaders(accessToken),
           body: JSON.stringify({
             name: name.trim(),
-            phone: phone || null,
+            phone: phoneValueForApi(phone) ?? null,
             email: email || null,
             note: note || null
           })
@@ -189,7 +192,14 @@ export function CustomerProfilePanel({
         <div>
           <p className="text-sm text-white/48">Клиент</p>
           <h3 className="mt-1 text-lg font-semibold">{order.customerName ?? "Клиент не указан"}</h3>
-          {order.customerPhone ? <p className="mt-1 text-sm text-white/52">{order.customerPhone}</p> : null}
+          {order.customerPhone ? (
+            <a
+              className="mt-1 inline-flex text-sm text-white/62 underline-offset-4 transition-colors hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30"
+              href={phoneTelHref(order.customerPhone)}
+            >
+              {order.customerPhone}
+            </a>
+          ) : null}
           {order.customerEmail ? <p className="mt-1 text-sm text-white/52">{order.customerEmail}</p> : null}
           {order.customerNote ? <p className="mt-2 text-sm leading-6 text-white/45">{order.customerNote}</p> : null}
         </div>
@@ -206,7 +216,7 @@ export function CustomerProfilePanel({
             autoComplete="tel"
             inputMode="tel"
             label="Телефон"
-            onChange={(event) => setPhone(formatPhoneInput(event.target.value))}
+            onChange={(event) => setPhone((current) => formatPhoneInput(event.target.value, current))}
             type="tel"
             value={phone}
           />
@@ -275,14 +285,6 @@ export function OrderSidePanel({
       : order.paymentStatus === "PARTIALLY_PAID"
         ? "amber"
         : "neutral";
-  const repairTone =
-    order.repairStatus === "ISSUED"
-      ? "mint"
-      : order.repairStatus === "READY"
-        ? "amber"
-        : order.repairStatus === "CANCELLED"
-          ? "coral"
-          : "neutral";
   const availableStatusOptions = repairStatusOptions.filter((status) => {
     if (canManageOrders) {
       return status.value !== "ISSUED" || order.repairStatus === "ISSUED";
@@ -300,7 +302,14 @@ export function OrderSidePanel({
     <GlassPanel className="grid content-start gap-4 p-5">
       <div>
         <p className="text-sm text-white/45">{order.customerName ?? "Клиент не указан"}</p>
-        {order.customerPhone ? <p className="mt-1 text-sm text-white/45">{order.customerPhone}</p> : null}
+        {order.customerPhone ? (
+          <a
+            className="mt-1 inline-flex text-sm text-white/55 underline-offset-4 transition-colors hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30"
+            href={phoneTelHref(order.customerPhone)}
+          >
+            {order.customerPhone}
+          </a>
+        ) : null}
         <h2 className="mt-1 text-2xl font-semibold">{order.instrumentName || order.description}</h2>
         <p className="mt-2 text-sm leading-6 text-white/55">{order.description}</p>
       </div>
@@ -309,7 +318,7 @@ export function OrderSidePanel({
         <div>
           <p className="text-xs uppercase text-white/40">Состояние</p>
           <div className="mt-2">
-            <StatusPill label={repairStatusLabel(order.repairStatus)} tone={repairTone} />
+            <StatusPill label={repairStatusLabel(order.repairStatus)} tone={repairStatusTone(order.repairStatus)} />
           </div>
         </div>
         <div>

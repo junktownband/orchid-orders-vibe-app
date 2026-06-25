@@ -11,13 +11,13 @@ import { createPortal } from "react-dom";
 
 import type { DashboardResponse } from "@orchid/shared";
 
-import { marginPercentFrom, money, percent, type OrderWarning } from "./app-core";
+import { marginPercentFrom, money, percent, type AppTone, type OrderWarning } from "./app-core";
 
 export function Background({ children }: { children: ReactNode }) {
   return (
     <main className="h-dvh min-h-dvh overflow-y-auto overflow-x-hidden bg-ink text-white">
       <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(180deg,#020710_0%,#061225_52%,#01050d_100%)]" />
-      <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.07)_0%,rgba(255,255,255,0)_30%,rgba(159,207,212,0.025)_100%)]" />
+      <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.07)_0%,rgba(255,255,255,0)_30%,rgba(210,190,152,0.025)_100%)]" />
       <div className="pointer-events-none fixed inset-x-0 top-0 h-px bg-white/12" />
       {children}
     </main>
@@ -166,7 +166,7 @@ export function PrimaryButton({
   return (
     <button
       {...props}
-      className={`inline-flex h-11 touch-manipulation items-center justify-center gap-2 rounded-lg bg-mint px-4 text-sm font-semibold text-ink shadow-command transition-[background-color,box-shadow,transform] hover:bg-mint/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/40 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+      className={`button-glass-primary inline-flex h-11 touch-manipulation items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition-[background,border-color,box-shadow,color,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/40 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
       type={type}
     >
       {children}
@@ -185,7 +185,7 @@ export function GhostButton({
   return (
     <button
       {...props}
-      className={`inline-flex h-11 touch-manipulation items-center justify-center gap-2 rounded-lg border border-white/[0.12] bg-white/[0.065] px-4 text-sm text-white shadow-inner-glass transition-[background-color,border-color,box-shadow,transform] hover:border-white/[0.2] hover:bg-white/[0.105] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-35 ${className}`}
+      className={`button-glass-muted inline-flex h-11 touch-manipulation items-center justify-center gap-2 rounded-lg px-4 text-sm transition-[background,border-color,box-shadow,color,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-35 ${className}`}
       type={type}
     >
       {children}
@@ -298,22 +298,28 @@ export function InlineStat({
 
 export function StatusPill({
   label,
+  size = "md",
   tone = "neutral"
 }: {
   label: string;
-  tone?: "mint" | "amber" | "coral" | "neutral";
+  size?: "sm" | "md";
+  tone?: AppTone;
 }) {
-  const toneClass =
-    tone === "mint"
-      ? "bg-mint/12 text-mint ring-mint/25"
-      : tone === "amber"
-        ? "bg-amber/14 text-amber ring-amber/25"
-        : tone === "coral"
-          ? "bg-coral/14 text-coral ring-coral/25"
-          : "bg-white/[0.08] text-white/72 ring-white/10";
+  const toneClass: Record<AppTone, string> = {
+    amber: "status-tone-amber",
+    coral: "status-tone-coral",
+    honey: "status-tone-honey",
+    mint: "status-tone-mint",
+    mist: "status-tone-mist",
+    neutral: "status-tone-neutral",
+    rose: "status-tone-rose",
+    sage: "status-tone-sage",
+    sand: "status-tone-sand"
+  };
+  const sizeClass = size === "sm" ? "px-2.5 py-1 text-xs" : "px-3 py-1 text-sm";
 
   return (
-    <span className={`inline-flex rounded-full px-3 py-1 text-sm ring-1 ${toneClass}`}>
+    <span className={`inline-flex rounded-full ring-1 ${sizeClass} ${toneClass[tone]}`}>
       {label}
     </span>
   );

@@ -45,6 +45,8 @@ export type RepairOrderListOptions = {
   tab?: "all" | "ready" | "active" | "completed";
   repairStatus?: RepairStatus;
   paymentStatus?: PaymentStatus;
+  createdFrom?: Date;
+  createdTo?: Date;
   cursor?: RepairOrderListCursor;
   limit: number;
 };
@@ -285,6 +287,14 @@ function listWhereSql(organizationId: string, options: RepairOrderListOptions) {
 
   if (options.paymentStatus) {
     conditions.push(Prisma.sql`ro."paymentStatus" = ${paymentStatusSql(options.paymentStatus)}`);
+  }
+
+  if (options.createdFrom) {
+    conditions.push(Prisma.sql`ro."createdAt" >= ${options.createdFrom}`);
+  }
+
+  if (options.createdTo) {
+    conditions.push(Prisma.sql`ro."createdAt" <= ${options.createdTo}`);
   }
 
   const search = options.q?.trim();

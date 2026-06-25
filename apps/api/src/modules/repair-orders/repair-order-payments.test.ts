@@ -577,6 +577,35 @@ describe("repair order payments", () => {
     expect(repository.findRepairOrder).toHaveBeenCalledWith("org-1", "repair-1");
   });
 
+  it("passes created date filters to the order list repository", async () => {
+    repository.listRepairOrders.mockResolvedValue({
+      items: [],
+      nextCursor: null,
+      hasMore: false
+    });
+
+    await expect(
+      getRepairOrders(ownerAuth, {
+        tab: "all",
+        createdFrom: "2026-04-27",
+        createdTo: "2026-06-25",
+        limit: 20
+      })
+    ).resolves.toEqual({
+      items: [],
+      nextCursor: null,
+      hasMore: false
+    });
+
+    expect(repository.listRepairOrders).toHaveBeenCalledWith(
+      "org-1",
+      expect.objectContaining({
+        createdFrom: new Date("2026-04-27T00:00:00.000Z"),
+        createdTo: new Date("2026-06-25T23:59:59.999Z")
+      })
+    );
+  });
+
   it("allows master to change working repair statuses", async () => {
     repository.updateRepairOrderStatus.mockResolvedValue(repairOrderRecord({ repairStatus: "READY" }));
 

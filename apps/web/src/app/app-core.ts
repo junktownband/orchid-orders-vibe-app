@@ -42,6 +42,16 @@ export type ServiceType = RepairOrderItemInput["type"];
 export type RepairStatus = RepairOrderResponse["repairStatus"];
 export type PaymentStatus = RepairOrderResponse["paymentStatus"];
 export type TaxSubject = NonNullable<RepairOrderResponse["taxSubject"]>;
+export type AppTone =
+  | "mint"
+  | "amber"
+  | "coral"
+  | "neutral"
+  | "mist"
+  | "sand"
+  | "honey"
+  | "sage"
+  | "rose";
 export type Icon = typeof ClipboardList;
 export type Navigate = (screen: Screen, options?: { replace?: boolean }) => void;
 export type OrdersListQuery = {
@@ -49,6 +59,8 @@ export type OrdersListQuery = {
   tab: RepairOrderTab;
   repairStatus: RepairStatus | "";
   paymentStatus: PaymentStatus | "";
+  createdFrom: string;
+  createdTo: string;
 };
 export type StoredAuthSession = {
   accessToken: string;
@@ -432,12 +444,15 @@ export function ordersQueryFromSearch(search: string): OrdersListQuery {
   const tab = params.get("tab");
   const repairStatus = params.get("repairStatus");
   const paymentStatus = params.get("paymentStatus");
+  const defaults = defaultOrdersDateRange();
 
   return {
     q: params.get("q") ?? "",
     tab: orderTabOptions.some((option) => option.value === tab) ? (tab as RepairOrderTab) : "all",
     repairStatus: repairStatusOptions.some((option) => option.value === repairStatus) ? (repairStatus as RepairStatus) : "",
-    paymentStatus: paymentStatusOptions.some((option) => option.value === paymentStatus) ? (paymentStatus as PaymentStatus) : ""
+    paymentStatus: paymentStatusOptions.some((option) => option.value === paymentStatus) ? (paymentStatus as PaymentStatus) : "",
+    createdFrom: dateInputParam(params.get("createdFrom")) ?? defaults.createdFrom,
+    createdTo: dateInputParam(params.get("createdTo")) ?? defaults.createdTo
   };
 }
 
@@ -458,6 +473,14 @@ export function searchForOrdersQuery(query: OrdersListQuery) {
 
   if (query.paymentStatus) {
     params.set("paymentStatus", query.paymentStatus);
+  }
+
+  if (query.createdFrom) {
+    params.set("createdFrom", query.createdFrom);
+  }
+
+  if (query.createdTo) {
+    params.set("createdTo", query.createdTo);
   }
 
   const value = params.toString();
@@ -605,6 +628,25 @@ export function recentDateRange(days: number, today = new Date()) {
   };
 }
 
+export function defaultOrdersDateRange(today = new Date()) {
+  const range = recentDateRange(60, today);
+
+  return {
+    createdFrom: range.from,
+    createdTo: range.to
+  };
+}
+
+function dateInputParam(value: string | null) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return undefined;
+  }
+
+  const date = new Date(`${value}T00:00:00.000Z`);
+
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value ? value : undefined;
+}
+
 export function shortId(value: string) {
   return value.slice(-6).toUpperCase();
 }
@@ -654,40 +696,84 @@ export function phoneDigits(value: string) {
   return value.replace(/\D/g, "");
 }
 
-export function formatPhoneInput(value: string) {
-  const digits = phoneDigits(value).slice(0, 15);
+export function formatPhoneInput(value: string, previousValue = "") {
+  const digits = phoneDigits(value);
+
+  if (!digits) {
+    return "+7";
+  }
+
+  if (/undefined/i.test(value) && /^7+$/.test(digits)) {
+    return "+7";
+  }
+
+  const normalized = digits.startsWith("8") ? `7${digits.slice(1)}` : digits;
+  let body = (normalized.startsWith("7") ? normalized.slice(1) : normalized).slice(0, 10);
+  const deletedMaskCharacter =
+    Boolean(previousValue) && value.length < previousValue.length && digits === phoneDigits(previousValue);
+
+  if (/\(\s*\)/.test(value)) {
+    body = "";
+  }
+
+  if (deletedMaskCharacter && body.length > 0) {
+    body = body.slice(0, -1);
+  }
+
+  if (!body) {
+    return "+7";
+  }
+
+  const area = body.slice(0, 3);
+  const prefix = body.slice(3, 6);
+  const firstPair = body.slice(6, 8);
+  const secondPair = body.slice(8, 10);
+  let formatted = `+7 (${area}`;
+
+  if (area.length === 3) {
+    formatted += ")";
+  }
+
+  if (prefix) {
+    formatted += ` ${prefix}`;
+  }
+
+  if (firstPair) {
+    formatted += `-${firstPair}`;
+  }
+
+  if (secondPair) {
+    formatted += `-${secondPair}`;
+  }
+
+  return formatted;
+}
+
+export function phoneTelHref(value: string) {
+  const digits = phoneDigits(value);
 
   if (!digits) {
     return "";
   }
 
-  const normalized = digits.startsWith("8") ? `7${digits.slice(1)}` : digits;
+  const normalized = digits.startsWith("8")
+    ? `7${digits.slice(1)}`
+    : digits.startsWith("7")
+      ? digits
+      : `7${digits.slice(0, 10)}`;
 
-  if (!normalized.startsWith("7")) {
-    return `+${normalized}`;
+  return `tel:+${normalized}`;
+}
+
+export function phoneValueForApi(value: string) {
+  const trimmed = value.trim();
+  const digits = phoneDigits(trimmed);
+
+  if (!digits || digits === "7" || digits === "8") {
+    return undefined;
   }
 
-  const body = normalized.slice(1);
-  const parts = [
-    body.slice(0, 3),
-    body.slice(3, 6),
-    body.slice(6, 8),
-    body.slice(8, 10)
-  ].filter(Boolean);
-
-  if (parts.length === 1) {
-    return `+7 (${parts[0]}`;
-  }
-
-  if (parts.length === 2) {
-    return `+7 (${parts[0]}) ${parts[1]}`;
-  }
-
-  if (parts.length === 3) {
-    return `+7 (${parts[0]}) ${parts[1]}-${parts[2]}`;
-  }
-
-  return `+7 (${parts[0]}) ${parts[1]}-${parts[2]}-${parts[3]}`;
+  return trimmed;
 }
 
 export function serviceTypeLabel(type: ServiceType) {
@@ -768,6 +854,26 @@ export function repairStatusLabel(status: RepairOrderResponse["repairStatus"]) {
   return "Отменен";
 }
 
+export function repairStatusTone(status: RepairOrderResponse["repairStatus"]): AppTone {
+  if (status === "ACCEPTED") {
+    return "mist";
+  }
+
+  if (status === "IN_PROGRESS") {
+    return "sand";
+  }
+
+  if (status === "READY") {
+    return "honey";
+  }
+
+  if (status === "ISSUED") {
+    return "sage";
+  }
+
+  return "rose";
+}
+
 export function auditActionLabel(action: AuditLogResponse["action"]) {
   const labels: Record<AuditLogResponse["action"], string> = {
     CREATE: "Создание",
@@ -823,7 +929,7 @@ export function auditDetails(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
 
-export function auditActionTone(action: AuditLogResponse["action"]): "mint" | "amber" | "coral" | "neutral" {
+export function auditActionTone(action: AuditLogResponse["action"]): AppTone {
   if (
     action === "CREATE" ||
     action === "CONFIRM" ||

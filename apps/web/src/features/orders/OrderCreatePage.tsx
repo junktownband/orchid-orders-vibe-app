@@ -21,6 +21,7 @@ import {
   isServiceItem,
   money,
   parsedMoneyOrZero,
+  phoneValueForApi,
   quickOrderItems,
   request,
   resaleTypes,
@@ -54,7 +55,7 @@ export function OrderCreatePage({
   const [serviceQuery, setServiceQuery] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("+7");
   const [instrumentName, setInstrumentName] = useState("");
   const [description, setDescription] = useState("");
   const [assignedMasterId, setAssignedMasterId] = useState("");
@@ -122,7 +123,7 @@ export function OrderCreatePage({
         body: JSON.stringify({
           customer: {
             name: customerName,
-            phone: customerPhone || undefined
+            phone: phoneValueForApi(customerPhone)
           },
           instrument: instrumentName
             ? {
@@ -170,7 +171,9 @@ export function OrderCreatePage({
               error={fieldErrors.customerPhone}
               inputMode="tel"
               label="Телефон"
-              onChange={(event) => setCustomerPhone(formatPhoneInput(event.target.value))}
+              onChange={(event) =>
+                setCustomerPhone((current) => formatPhoneInput(event.target.value, current))
+              }
               placeholder="+7 (999) 123-45-67"
               type="tel"
               value={customerPhone}

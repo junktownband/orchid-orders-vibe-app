@@ -15,6 +15,7 @@ import {
   paymentStatusOptions,
   repairStatusLabel,
   repairStatusOptions,
+  repairStatusTone,
   request,
   requestPathForOrders,
   serviceTypeLabel,
@@ -29,6 +30,7 @@ import {
   PageToolbar,
   PrimaryButton,
   SelectField,
+  StatusPill,
   TextField,
   WarningPill
 } from "../../app/ui";
@@ -58,10 +60,10 @@ function ViewModeButton({
     <button
       aria-label={label}
       aria-pressed={isActive}
-      className={`inline-flex h-10 touch-manipulation items-center justify-center gap-2 rounded-md px-3 text-sm transition-[background-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30 ${
+      className={`segmented-glass-button inline-flex h-9 touch-manipulation items-center justify-center gap-2 rounded-[9px] px-3 text-sm transition-[background,border-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30 ${
         isActive
-          ? "bg-mint text-ink shadow-command"
-          : "bg-white/[0.055] text-white/68 ring-1 ring-white/10 hover:bg-white/[0.09]"
+          ? "segmented-glass-button-active"
+          : ""
       }`}
       onClick={onClick}
       title={label}
@@ -106,9 +108,11 @@ function OrderCompactRow({
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
-          <span className="rounded-full bg-white/[0.08] px-3 py-1 text-sm text-white/72 ring-1 ring-white/10">
-            {repairStatusLabel(order.repairStatus)}
-          </span>
+          <StatusPill
+            label={repairStatusLabel(order.repairStatus)}
+            size="sm"
+            tone={repairStatusTone(order.repairStatus)}
+          />
           <span className="rounded-full bg-white/[0.08] px-3 py-1 text-sm text-white/65 ring-1 ring-white/10">
             {paymentStatusLabel(order.paymentStatus)}
           </span>
@@ -163,13 +167,13 @@ export function OrdersListPage({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [viewMode, setViewMode] = useState<OrdersViewMode>("compact");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(
-    Boolean(query.repairStatus || query.paymentStatus)
+    Boolean(query.repairStatus || query.paymentStatus || query.createdFrom || query.createdTo)
   );
   const [error, setError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const queryKey = useMemo(
-    () => `${query.q}|${query.tab}|${query.repairStatus}|${query.paymentStatus}`,
-    [query.paymentStatus, query.q, query.repairStatus, query.tab]
+    () => `${query.q}|${query.tab}|${query.repairStatus}|${query.paymentStatus}|${query.createdFrom}|${query.createdTo}`,
+    [query.createdFrom, query.createdTo, query.paymentStatus, query.q, query.repairStatus, query.tab]
   );
 
   useEffect(() => {
@@ -273,14 +277,14 @@ export function OrdersListPage({
     );
   }
 
-  const hasAdvancedFilters = Boolean(query.repairStatus || query.paymentStatus);
+  const hasAdvancedFilters = Boolean(query.repairStatus || query.paymentStatus || query.createdFrom || query.createdTo);
 
   return (
     <div>
       <PageToolbar
         action={
           <div className="flex flex-wrap justify-end gap-2">
-            <div className="flex rounded-lg bg-black/10 p-1 ring-1 ring-white/[0.08]">
+            <div className="segmented-glass flex rounded-xl p-1">
               <ViewModeButton
                 isActive={viewMode === "compact"}
                 label="Компактный список"
@@ -330,7 +334,7 @@ export function OrdersListPage({
             </GhostButton>
           </div>
           {showAdvancedFilters ? (
-            <div className="grid gap-3 border-t border-white/[0.08] pt-3 md:grid-cols-2">
+            <div className="grid gap-3 border-t border-white/[0.08] pt-3 md:grid-cols-2 xl:grid-cols-4">
               <SelectField
                 label="Статус ремонта"
                 onChange={(event) =>
@@ -359,24 +363,36 @@ export function OrdersListPage({
                   </option>
                 ))}
               </SelectField>
+              <TextField
+                label="РЎРѕР·РґР°РЅ СЃ"
+                onChange={(event) => updateQuery({ createdFrom: event.target.value })}
+                type="date"
+                value={query.createdFrom}
+              />
+              <TextField
+                label="РЎРѕР·РґР°РЅ РїРѕ"
+                onChange={(event) => updateQuery({ createdTo: event.target.value })}
+                type="date"
+                value={query.createdTo}
+              />
             </div>
           ) : null}
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {orderTabOptions.map((tab) => (
-              <button
-                key={tab.value}
-                aria-pressed={query.tab === tab.value}
-                className={`h-10 shrink-0 rounded-md px-3 text-sm transition-[background-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30 ${
-                  query.tab === tab.value
-                    ? "bg-mint text-ink shadow-command"
-                    : "bg-white/[0.055] text-white/68 ring-1 ring-white/10 hover:bg-white/[0.09]"
-                }`}
-                onClick={() => updateQuery({ tab: tab.value })}
-                type="button"
-              >
-                {tab.label}
-              </button>
-            ))}
+          <div className="overflow-x-auto pb-1">
+            <div className="segmented-glass inline-flex min-w-max rounded-xl p-1">
+              {orderTabOptions.map((tab) => (
+                <button
+                  key={tab.value}
+                  aria-pressed={query.tab === tab.value}
+                  className={`segmented-glass-button h-9 shrink-0 rounded-[9px] px-3 text-sm transition-[background,border-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30 ${
+                    query.tab === tab.value ? "segmented-glass-button-active" : ""
+                  }`}
+                  onClick={() => updateQuery({ tab: tab.value })}
+                  type="button"
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </GlassPanel>
@@ -479,9 +495,11 @@ export function OrdersListPage({
                   </div>
 
                   <div className="mt-4 flex flex-wrap justify-between gap-2">
-                    <span className="rounded-full bg-white/[0.08] px-3 py-2 text-sm text-white/72 ring-1 ring-white/10">
-                      {repairStatusLabel(order.repairStatus)}
-                    </span>
+                    <StatusPill
+                      label={repairStatusLabel(order.repairStatus)}
+                      size="sm"
+                      tone={repairStatusTone(order.repairStatus)}
+                    />
                     <span className="inline-flex h-10 items-center gap-2 rounded-md border border-white/[0.08] bg-white/[0.045] px-3 text-sm text-white/48 shadow-inner-glass transition-[background-color,color] group-hover:bg-white/[0.075] group-hover:text-white">
                       Открыть
                       <ChevronRight aria-hidden="true" size={16} />

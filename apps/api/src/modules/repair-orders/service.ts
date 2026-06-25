@@ -252,6 +252,14 @@ function orderAuditSnapshot(order: RepairOrderRecord) {
   };
 }
 
+function startOfDate(value?: string) {
+  return value ? new Date(`${value}T00:00:00.000Z`) : undefined;
+}
+
+function endOfDate(value?: string) {
+  return value ? new Date(`${value}T23:59:59.999Z`) : undefined;
+}
+
 export async function getRepairOrders(auth: AuthContext, query: RepairOrdersQuery) {
   const cursor = query.cursor ? decodeRepairOrderCursor(query.cursor) : undefined;
 
@@ -269,6 +277,8 @@ export async function getRepairOrders(auth: AuthContext, query: RepairOrdersQuer
     tab: query.tab,
     repairStatus: query.repairStatus,
     paymentStatus: query.paymentStatus,
+    createdFrom: startOfDate(query.createdFrom),
+    createdTo: endOfDate(query.createdTo),
     cursor: cursor ?? undefined,
     limit: query.limit
   });

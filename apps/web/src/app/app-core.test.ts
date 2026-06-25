@@ -1,6 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { pathForScreen, screenFromLocation } from "./app-core";
+import {
+  formatPhoneInput,
+  ordersQueryFromSearch,
+  pathForScreen,
+  phoneTelHref,
+  phoneValueForApi,
+  requestPathForOrders,
+  screenFromLocation
+} from "./app-core";
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 function locationFor(pathname: string, search = "") {
   return { pathname, search } as Location;
@@ -34,5 +46,39 @@ describe("app routing helpers", () => {
       itemId: "item-1"
     });
     expect(pathForScreen(screen)).toBe("/expenses/new?orderId=order-1&itemId=item-1");
+  });
+
+  it("defaults order list filters to the last 60 days", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-25T12:00:00.000Z"));
+
+    const query = ordersQueryFromSearch("");
+
+    expect(query.createdFrom).toBe("2026-04-27");
+    expect(query.createdTo).toBe("2026-06-25");
+    expect(requestPathForOrders(query)).toBe(
+      "/api/v1/repair-orders?createdFrom=2026-04-27&createdTo=2026-06-25&limit=20"
+    );
+  });
+
+  it("formats partial phone input without placeholder fragments", () => {
+    expect(formatPhoneInput("+7")).toBe("+7");
+    expect(formatPhoneInput("999")).toBe("+7 (999)");
+    expect(formatPhoneInput("+7 (666", "+7 (66")).toBe("+7 (666)");
+    expect(formatPhoneInput("+7 (999", "+7 (999)")).toBe("+7 (99");
+    expect(formatPhoneInput("+7 (999) ", "+7 (999) 1")).toBe("+7 (999)");
+    expect(formatPhoneInput("+7 () 123-45-67")).toBe("+7");
+    expect(formatPhoneInput("")).toBe("+7");
+    expect(formatPhoneInput("9991234567")).toBe("+7 (999) 123-45-67");
+    expect(formatPhoneInput("+7 (undefined) undefined")).toBe("+7");
+    expect(
+      formatPhoneInput(
+        "+7 (undefined) undefined-undefined-undefined+7 (undefined) undefined-undefined-undefined"
+      )
+    ).toBe("+7");
+    expect(formatPhoneInput("89991234567")).toBe("+7 (999) 123-45-67");
+    expect(phoneTelHref("+7 (999) 123-45-67")).toBe("tel:+79991234567");
+    expect(phoneValueForApi("+7")).toBeUndefined();
+    expect(phoneValueForApi("+7 (999) 123-45-67")).toBe("+7 (999) 123-45-67");
   });
 });

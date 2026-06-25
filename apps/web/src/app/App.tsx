@@ -359,10 +359,10 @@ function AppShell({
                 key={item.section}
                 aria-current={screen.section === item.section ? "page" : undefined}
                 aria-label={item.label}
-                className={`grid h-14 touch-manipulation place-items-center gap-1 rounded-md px-1 py-2 text-[11px] transition-[background-color,color,box-shadow,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30 active:translate-y-px lg:flex lg:h-11 lg:w-full lg:justify-start lg:gap-3 lg:px-3 lg:py-0 lg:text-sm ${
+                className={`grid h-14 touch-manipulation place-items-center gap-1 rounded-md px-1 py-2 text-[11px] transition-[background,border-color,color,box-shadow,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30 active:translate-y-px lg:flex lg:h-11 lg:w-full lg:justify-start lg:gap-3 lg:px-3 lg:py-0 lg:text-sm ${
                   screen.section === item.section
-                    ? "bg-mint text-ink shadow-command"
-                    : "text-white/62 hover:bg-white/[0.1] hover:text-white"
+                    ? "button-glass-active"
+                    : "border border-transparent text-white/62 hover:border-white/[0.1] hover:bg-white/[0.075] hover:text-white"
                 }`}
                 onClick={() => navigate(defaultScreen(item.section))}
                 type="button"
