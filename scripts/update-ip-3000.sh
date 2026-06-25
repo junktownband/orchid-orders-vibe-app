@@ -4,6 +4,9 @@ set -Eeuo pipefail
 SYSTEM_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 export PATH="$SYSTEM_PATH"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SOURCE_DIR="${ORCHID_SOURCE_DIR:-$SCRIPT_ROOT}"
 APP_USER="${ORCHID_APP_USER:-orchid}"
 APP_DIR="${ORCHID_APP_DIR:-/opt/orchid-control}"
 ENV_DIR="${ORCHID_ENV_DIR:-/etc/orchid-control}"
@@ -37,6 +40,13 @@ run_as_app_user() {
   local label="$1"
   local command="$2"
   log "$label"
+
+  if [[ "$APP_USER" == "root" || "$APP_USER" == "$(id -un)" ]]; then
+    printf '+ env PATH=%q bash -lc %q\n' "$SYSTEM_PATH" "$command"
+    env PATH="$SYSTEM_PATH" bash -lc "$command"
+    return
+  fi
+
   printf '+ sudo -u %q -H env PATH=%q bash -lc %q\n' "$APP_USER" "$SYSTEM_PATH" "$command"
   sudo -u "$APP_USER" -H env PATH="$SYSTEM_PATH" bash -lc "$command"
 }
@@ -62,36 +72,36 @@ validate_existing_install() {
 }
 
 sync_application() {
-  log "Updating application code in $APP_DIR"
+  log "Updating source checkout in $SOURCE_DIR"
 
-  if [[ -n "$REPO_URL" || -d "$APP_DIR/.git" ]]; then
+  if [[ -d "$SOURCE_DIR/.git" ]]; then
+    run_step "Fetching source repository" git -C "$SOURCE_DIR" fetch --prune origin "$REPO_REF"
+    run_step "Checking out source repository ref" git -C "$SOURCE_DIR" checkout "$REPO_REF"
+    run_step "Resetting source repository to origin ref" git -C "$SOURCE_DIR" reset --hard "origin/$REPO_REF"
+  elif [[ -n "$REPO_URL" && -d "$APP_DIR/.git" ]]; then
+    log "Source checkout was not found; updating application git checkout in $APP_DIR."
     run_step "Ensuring application directory ownership" chown -R "$APP_USER:$APP_USER" "$APP_DIR"
-
-    if [[ ! -d "$APP_DIR/.git" ]]; then
-      fail "ORCHID_REPO_URL was set, but $APP_DIR is not a git checkout. Run the full deploy first."
-    fi
 
     run_as_app_user "Fetching repository" "git -C '$APP_DIR' fetch --prune origin '$REPO_REF'"
     run_as_app_user "Checking out repository ref" "git -C '$APP_DIR' checkout '$REPO_REF'"
     run_as_app_user "Resetting repository to origin ref" "git -C '$APP_DIR' reset --hard 'origin/$REPO_REF'"
     return
+  elif [[ -n "$REPO_URL" ]]; then
+    fail "ORCHID_REPO_URL was set, but neither $SOURCE_DIR nor $APP_DIR is a git checkout. Run the full deploy first."
   fi
 
-  local source_dir
-  source_dir="$(pwd)"
+  [[ -f "$SOURCE_DIR/package.json" ]] || fail "Source package.json was not found in $SOURCE_DIR. Run from the Orchid repository root or set ORCHID_SOURCE_DIR."
 
-  if [[ ! -f "$source_dir/package.json" ]]; then
-    fail "Run from the Orchid repository root or set ORCHID_REPO_URL."
-  fi
+  log "Syncing source checkout into application directory $APP_DIR"
 
-  if [[ "$(realpath "$source_dir")" != "$(realpath "$APP_DIR")" ]]; then
+  if [[ "$(realpath "$SOURCE_DIR")" != "$(realpath "$APP_DIR")" ]]; then
     run_step "Copying repository into application directory" rsync -a --delete \
       --exclude '.git/' \
       --exclude 'node_modules/' \
       --exclude 'apps/*/dist/' \
       --exclude 'packages/*/dist/' \
       --exclude 'output/' \
-      "$source_dir/" "$APP_DIR/"
+      "$SOURCE_DIR/" "$APP_DIR/"
   else
     log "Application directory already points at the current repository."
   fi
@@ -135,6 +145,7 @@ verify_update() {
 print_summary() {
   log "Update complete"
   printf 'Application directory: %s\n' "$APP_DIR"
+  printf 'Source checkout:       %s\n' "$SOURCE_DIR"
   printf 'Environment:           %s\n' "$ENV_FILE"
   printf 'Updated ref:           %s\n' "$REPO_REF"
   printf '\nUseful checks:\n'
