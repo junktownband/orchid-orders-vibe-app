@@ -7,4 +7,5 @@ export * from "./api/settings.js";
 export * from "./api/customers.js";
 export * from "./api/expenses.js";
 export * from "./api/commissions.js";
+export * from "./api/finance.js";
 export * from "./api/audit.js";

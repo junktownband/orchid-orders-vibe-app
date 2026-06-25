@@ -9,6 +9,7 @@ import {
   authHeaders,
   canAccessBackOffice,
   canChangeRepairStatus,
+  canManageMoney,
   canManageReferenceSettings,
   canManageOrders,
   clearStoredAuthSession,
@@ -71,6 +72,11 @@ const ExpenseCreatePage = lazy(() =>
 const AnalyticsPage = lazy(() =>
   import("../features/analytics/AnalyticsPage").then(({ AnalyticsPage }) => ({
     default: AnalyticsPage
+  }))
+);
+const MoneyPage = lazy(() =>
+  import("../features/money/MoneyPage").then(({ MoneyPage }) => ({
+    default: MoneyPage
   }))
 );
 const SettingsProfilePage = lazy(() =>
@@ -136,6 +142,7 @@ function AppShell({
   const shouldReduceMotion = useReducedMotion();
   const visibleNavItems = useMemo(() => navItemsForUser(user), [user]);
   const canUseBackOffice = canAccessBackOffice(user);
+  const canUseMoney = canManageMoney(user);
   const canManageOrderFlows = canManageOrders(user);
   const canChangeOrderStatus = canChangeRepairStatus(user);
   const canCorrectFinancials = ["OWNER", "ADMIN"].includes(user.role);
@@ -298,6 +305,9 @@ function AppShell({
               ) : null}
               {canUseBackOffice && screen.section === "analytics" ? (
                 <AnalyticsPage accessToken={accessToken} user={user} />
+              ) : null}
+              {canUseMoney && screen.section === "money" ? (
+                <MoneyPage accessToken={accessToken} navigate={navigate} />
               ) : null}
               {canUseBackOffice && screen.section === "settings" && screen.view === "profile" ? (
                 <SettingsProfilePage user={user} navigate={navigate} onLogout={handleLogout} />

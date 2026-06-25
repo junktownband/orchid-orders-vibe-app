@@ -25,21 +25,21 @@ export const productionUsers: SeedUser[] = [
     name: "Рома",
     role: Role.ADMIN,
     passwordEnvName: "ORCHID_SEED_PASSWORD_ROMA",
-    commissionPercent: null
+    commissionPercent: new Prisma.Decimal("0.6000")
   },
   {
     email: "yura@orchid.local",
     name: "Юра",
     role: Role.ADMIN,
     passwordEnvName: "ORCHID_SEED_PASSWORD_YURA",
-    commissionPercent: null
+    commissionPercent: new Prisma.Decimal("0.6000")
   },
   {
     email: "lenya@orchid.local",
     name: "Леня",
     role: Role.ADMIN,
     passwordEnvName: "ORCHID_SEED_PASSWORD_LENYA",
-    commissionPercent: null
+    commissionPercent: new Prisma.Decimal("0.6000")
   },
   {
     email: "vanya@orchid.local",

@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import { BarChart3, ClipboardList, Search, Settings, WalletCards } from "lucide-react";
+import { BarChart3, ClipboardList, Landmark, Search, Settings, WalletCards } from "lucide-react";
 
 import {
   type AuditLogResponse,
@@ -19,12 +19,13 @@ export const request = apiRequest;
 export const queryClient = new QueryClient();
 export const authSessionStorageKey = "orchid_auth_session_v1";
 
-export type MainSection = "dashboard" | "orders" | "expenses" | "analytics" | "settings";
+export type MainSection = "dashboard" | "orders" | "expenses" | "analytics" | "money" | "settings";
 export type Screen =
   | { section: "dashboard" }
   | { section: "orders"; view: "list" | "create" | "detail" | "issue"; orderId?: string }
   | { section: "expenses"; view: "list" | "create"; orderId?: string; itemId?: string }
   | { section: "analytics" }
+  | { section: "money" }
   | {
       section: "settings";
       view:
@@ -82,6 +83,7 @@ export const navItems: Array<{ section: MainSection; label: string; icon: Icon }
   { section: "dashboard", label: "Главная", icon: BarChart3 },
   { section: "orders", label: "Заказы", icon: ClipboardList },
   { section: "expenses", label: "Расходы", icon: WalletCards },
+  { section: "money", label: "Деньги", icon: Landmark },
   { section: "analytics", label: "Выплаты", icon: Search },
   { section: "settings", label: "Настройки", icon: Settings }
 ];
@@ -96,6 +98,10 @@ export function canChangeRepairStatus(user: Pick<AuthUser, "role">) {
 
 export function canAccessBackOffice(user: Pick<AuthUser, "role">) {
   return ["OWNER", "ADMIN", "MANAGER"].includes(user.role);
+}
+
+export function canManageMoney(user: Pick<AuthUser, "role">) {
+  return ["OWNER", "ADMIN"].includes(user.role);
 }
 
 export function canManageReferenceSettings(user: Pick<AuthUser, "role">) {
@@ -123,11 +129,23 @@ export function roleLabel(role: AuthUser["role"]) {
 }
 
 export function navItemsForUser(user: Pick<AuthUser, "role">) {
-  return canAccessBackOffice(user) ? navItems : navItems.filter((item) => item.section === "orders");
+  if (!canAccessBackOffice(user)) {
+    return navItems.filter((item) => item.section === "orders");
+  }
+
+  if (canManageMoney(user)) {
+    return navItems;
+  }
+
+  return navItems.filter((item) => item.section !== "money");
 }
 
 export function screenForUser(user: Pick<AuthUser, "role">, screen: Screen): Screen {
   if (canAccessBackOffice(user)) {
+    if (screen.section === "money" && !canManageMoney(user)) {
+      return { section: "dashboard" };
+    }
+
     if (
       screen.section === "settings" &&
       ["members", "payment-methods", "expense-categories"].includes(screen.view) &&
@@ -255,6 +273,10 @@ export function screenTitle(screen: Screen) {
     return screen.view === "create" ? "Новый расход" : "Расходы";
   }
 
+  if (screen.section === "money") {
+    return "Деньги";
+  }
+
   if (screen.section === "settings") {
     if (screen.view === "audit") {
       return "Журнал";
@@ -326,6 +348,10 @@ export function screenFromLocation(location: Location): Screen {
 
   if (parts[0] === "analytics") {
     return { section: "analytics" };
+  }
+
+  if (parts[0] === "money") {
+    return { section: "money" };
   }
 
   if (parts[0] === "settings") {
@@ -402,6 +428,10 @@ export function pathForScreen(screen: Screen) {
 
   if (screen.section === "analytics") {
     return "/analytics";
+  }
+
+  if (screen.section === "money") {
+    return "/money";
   }
 
   if (screen.section === "settings") {

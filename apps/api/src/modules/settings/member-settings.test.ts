@@ -30,7 +30,7 @@ const audit = vi.hoisted(() => ({
 vi.mock("./repository.js", () => repository);
 vi.mock("../audit/service.js", () => audit);
 
-const { editMember, getMembers } = await import("./service.js");
+const { addMember, editMember, getMembers } = await import("./service.js");
 
 const ownerAuth: AuthContext = {
   userId: "owner-user",
@@ -152,7 +152,7 @@ describe("member settings service", () => {
       editMember(ownerAuth, "admin-membership", {
         name: "Updated Admin",
         email: "admin@orchid.local",
-        commissionPercent: null
+        commissionPercent: 60
       })
     ).resolves.toMatchObject({
       id: "admin-membership",
@@ -162,8 +162,35 @@ describe("member settings service", () => {
 
     expect(repository.updateMasterMember).toHaveBeenCalledWith(
       expect.objectContaining({
+        commissionPercent: expect.objectContaining({}),
         membershipId: "admin-membership",
         manageableRoles: [Role.OWNER, Role.ADMIN, Role.MANAGER, Role.MASTER]
+      })
+    );
+  });
+
+  it("defaults newly created workshop members to 60 percent commission", async () => {
+    const createdMaster = memberRecord(Role.MASTER, {
+      commissionPercent: 0.6
+    });
+
+    repository.findUserWithOrganizationMembership.mockResolvedValue(null);
+    repository.createMasterMember.mockResolvedValue(createdMaster);
+    audit.writeAuditLog.mockResolvedValue(undefined);
+
+    await expect(
+      addMember(ownerAuth, {
+        name: "New Master",
+        email: "new-master@orchid.local",
+        phone: undefined
+      })
+    ).resolves.toMatchObject({
+      commissionPercent: 60
+    });
+
+    expect(repository.createMasterMember).toHaveBeenCalledWith(
+      expect.objectContaining({
+        commissionPercent: expect.objectContaining({})
       })
     );
   });

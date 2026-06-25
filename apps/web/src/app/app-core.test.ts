@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   formatPhoneInput,
+  navItemsForUser,
   ordersQueryFromSearch,
   pathForScreen,
   phoneTelHref,
@@ -46,6 +47,14 @@ describe("app routing helpers", () => {
       itemId: "item-1"
     });
     expect(pathForScreen(screen)).toBe("/expenses/new?orderId=order-1&itemId=item-1");
+  });
+
+  it("keeps money route only for owners and admins", () => {
+    expect(pathForScreen(screenFromLocation(locationFor("/money")))).toBe("/money");
+    expect(navItemsForUser({ role: "OWNER" }).map((item) => item.section)).toContain("money");
+    expect(navItemsForUser({ role: "ADMIN" }).map((item) => item.section)).toContain("money");
+    expect(navItemsForUser({ role: "MANAGER" }).map((item) => item.section)).not.toContain("money");
+    expect(navItemsForUser({ role: "MASTER" }).map((item) => item.section)).not.toContain("money");
   });
 
   it("defaults order list filters to the last 60 days", () => {

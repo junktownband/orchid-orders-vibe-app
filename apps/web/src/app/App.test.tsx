@@ -134,7 +134,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Войти" }));
 
     expect(await screen.findByLabelText("Заказы")).toBeInTheDocument();
-    expect(await screen.findByText("Состав остатка")).toBeInTheDocument();
+    expect(await screen.findByText("Состояние заказов")).toBeInTheDocument();
     expectNoMojibake(baseElement);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/v1/auth/login",

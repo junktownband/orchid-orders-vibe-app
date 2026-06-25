@@ -64,6 +64,11 @@ enum CommissionPayoutStatus {
   PAID
 }
 
+enum FinanceOperationType {
+  DEPOSIT
+  WITHDRAWAL
+}
+
 enum AuditAction {
   CREATE
   UPDATE
@@ -91,6 +96,7 @@ model Organization {
   customers           Customer[]
   expenseCategories   ExpenseCategory[]
   expenses            Expense[]
+  financeOperations   FinanceOperation[]
   instruments         Instrument[]
   memberships         Membership[]
   paymentMethods      PaymentMethod[]
@@ -115,6 +121,7 @@ model User {
   acceptedPayments Payment[]         @relation("PaymentAcceptedBy")
   auditLogs        AuditLog[]
   createdExpenses  Expense[]         @relation("ExpenseCreatedBy")
+  createdFinanceOperations FinanceOperation[] @relation("FinanceOperationCreatedBy")
   memberships      Membership[]
   paidCommissions  RepairOrderItem[] @relation("RepairOrderItemCommissionPaidBy")
   paidRepairOrders RepairOrder[]     @relation("RepairOrderPaidBy")
@@ -278,6 +285,10 @@ model RepairOrderItem {
   @@index([organizationId, repairOrderId])
   @@index([organizationId, assignedMasterMembershipId])
   @@index([organizationId, commissionPayoutStatus])
+  @@index([organizationId, commissionCalculatedAt, id], map: "RepairOrderItem_org_commission_calc_idx")
+  @@index([organizationId, commissionPayoutStatus, commissionCalculatedAt, id], map: "RepairOrderItem_org_payout_calc_idx")
+  @@index([organizationId, commissionPayoutStatus, commissionPaidAt, id], map: "RepairOrderItem_org_payout_paid_idx")
+  @@index([organizationId, assignedMasterMembershipId, commissionPayoutStatus, commissionCalculatedAt, id], map: "RepairOrderItem_org_master_payout_calc_idx")
   @@index([organizationId, serviceCatalogItemId])
   @@index([organizationId, type])
 }
@@ -303,6 +314,7 @@ model Payment {
   repairOrder   RepairOrder    @relation(fields: [repairOrderId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, paidAt])
+  @@index([organizationId, isVoided, paidAt], map: "Payment_org_voided_paid_idx")
   @@index([repairOrderId])
 }
 
@@ -337,8 +349,29 @@ model Expense {
   @@index([organizationId, spentAt])
   @@index([organizationId, kind])
   @@index([organizationId, status])
+  @@index([organizationId, status, spentAt], map: "Expense_org_status_spent_idx")
+  @@index([organizationId, kind, status, spentAt], map: "Expense_org_kind_status_spent_idx")
   @@index([organizationId, repairOrderId])
   @@index([organizationId, repairOrderItemId])
+}
+
+model FinanceOperation {
+  id              String               @id @default(cuid())
+  organizationId  String
+  createdByUserId String?
+  type            FinanceOperationType
+  amountCents     Int
+  occurredAt      DateTime
+  description     String
+  comment         String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  createdBy    User?        @relation("FinanceOperationCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, occurredAt])
+  @@index([organizationId, type])
 }
 
 model PaymentMethod {

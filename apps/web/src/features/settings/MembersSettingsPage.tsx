@@ -55,7 +55,7 @@ export function MembersSettingsPage({
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPhone, setNewPhone] = useState("+7");
-  const [newCommissionPercent, setNewCommissionPercent] = useState("");
+  const [newCommissionPercent, setNewCommissionPercent] = useState("60");
   const [isLoading, setIsLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -131,7 +131,7 @@ export function MembersSettingsPage({
       setNewName("");
       setNewEmail("");
       setNewPhone("+7");
-      setNewCommissionPercent("");
+      setNewCommissionPercent("60");
       await refreshMembers();
     } catch (requestError) {
       setError(errorMessage(requestError, "Не удалось добавить мастера."));
@@ -151,8 +151,7 @@ export function MembersSettingsPage({
     setSavingId(member.id);
 
     try {
-      const commissionPercent = parsePercentInput(draft.commissionPercent);
-      const memberCommissionPercent = member.role === "MASTER" ? commissionPercent : null;
+      const memberCommissionPercent = parsePercentInput(draft.commissionPercent);
 
       if (Number.isNaN(memberCommissionPercent)) {
         throw new Error("Invalid commission percent");
@@ -226,10 +225,9 @@ export function MembersSettingsPage({
               inputMode="decimal"
               label="Комиссия, %"
               onChange={(event) => setNewCommissionPercent(event.target.value)}
-              placeholder="30"
+              placeholder="60"
               value={newCommissionPercent}
             />
-            <p className="text-xs leading-5 text-white/42">Dev пароль для новых мастеров: orchid12345.</p>
             {error ? <p className="text-sm text-coral">{error}</p> : null}
             <PrimaryButton disabled={isCreating || !newName || !newEmail} type="submit">
               <Plus size={17} />
@@ -247,7 +245,6 @@ export function MembersSettingsPage({
           ) : null}
           {members.map((member) => {
             const draft = drafts[member.id] ?? memberDraft(member);
-            const isMaster = member.role === "MASTER";
             const isCurrentUser = member.userId === user.id;
 
             return (
@@ -256,12 +253,12 @@ export function MembersSettingsPage({
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-lg font-semibold">{member.name}</h3>
-                      <StatusPill label={memberRoleLabel(member.role)} tone={isMaster ? "mint" : "neutral"} />
+                      <StatusPill label={memberRoleLabel(member.role)} tone={member.role === "MASTER" ? "mint" : "neutral"} />
                       <StatusPill label={member.isActive ? "Активен" : "Отключен"} tone={member.isActive ? "mint" : "neutral"} />
                     </div>
                     <p className="mt-1 text-sm text-white/45">
                       {member.email}
-                      {isMaster
+                      {member.commissionPercent !== null
                         ? ` · комиссия ${member.commissionPercent === null ? "не задана" : `${percent(member.commissionPercent)}%`}`
                         : null}
                     </p>
@@ -291,14 +288,12 @@ export function MembersSettingsPage({
                     type="tel"
                     value={draft.phone}
                   />
-                  {isMaster ? (
-                    <TextField
-                      inputMode="decimal"
-                      label="Комиссия, %"
-                      onChange={(event) => updateDraft(member.id, { commissionPercent: event.target.value })}
-                      value={draft.commissionPercent}
-                    />
-                  ) : null}
+                  <TextField
+                    inputMode="decimal"
+                    label="Комиссия, %"
+                    onChange={(event) => updateDraft(member.id, { commissionPercent: event.target.value })}
+                    value={draft.commissionPercent}
+                  />
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <PrimaryButton disabled={savingId === member.id} onClick={() => void saveMember(member)}>

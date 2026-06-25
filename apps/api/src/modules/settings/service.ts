@@ -43,6 +43,7 @@ import {
 
 const selfEmployedIndividualRateBps = 400 as const;
 const selfEmployedBusinessRateBps = 600 as const;
+const defaultWorkshopCommissionPercent = 60;
 
 type SettingsRecord = Awaited<ReturnType<typeof getOrCreateOrganizationSettings>>;
 type PaymentMethodRecord = Awaited<ReturnType<typeof listPaymentMethods>>[number];
@@ -362,7 +363,7 @@ export async function addMember(auth: AuthContext, input: CreateMemberInput): Pr
   const email = input.email.trim().toLowerCase();
   const existingUser = await findUserWithOrganizationMembership(email, auth.organizationId);
   const existingMembership = existingUser?.memberships[0];
-  const commissionPercent = commissionPercentToDb(input.commissionPercent);
+  const commissionPercent = commissionPercentToDb(input.commissionPercent ?? defaultWorkshopCommissionPercent);
 
   if (existingMembership && existingMembership.role !== Role.MASTER) {
     throw new AuthError(apiErrorCodes.conflict, "Only master accounts can be managed from this screen", 409);

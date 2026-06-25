@@ -2,6 +2,13 @@ import { z } from "zod";
 
 import { moneyCentsSchema, repairStatusSchema } from "./common.js";
 
+export const dashboardQuerySchema = z.object({
+  month: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
+    .optional()
+});
+
 export const dashboardResponseSchema = z.object({
   period: z.object({
     from: z.string(),
@@ -36,4 +43,5 @@ export const dashboardResponseSchema = z.object({
   )
 });
 
+export type DashboardQuery = z.infer<typeof dashboardQuerySchema>;
 export type DashboardResponse = z.infer<typeof dashboardResponseSchema>;

@@ -1,4 +1,4 @@
-import { apiErrorCodes, type DashboardResponse } from "@orchid/shared";
+import { apiErrorCodes, type DashboardQuery, type DashboardResponse } from "@orchid/shared";
 
 import { AuthError, type AuthContext } from "../auth/service.js";
 import { getDashboardData } from "./repository.js";
@@ -129,12 +129,77 @@ export function monthPeriod(now = new Date(), timeZone = "UTC") {
   return { from, to };
 }
 
-export async function getDashboard(auth: AuthContext): Promise<DashboardResponse> {
+export function monthPeriodFromQuery(query: DashboardQuery = {}, now = new Date(), timeZone = "UTC") {
+  if (!query.month) {
+    return monthPeriod(now, timeZone);
+  }
+
+  const [year, month] = query.month.split("-").map(Number);
+  const from = zonedDateTimeToUtc(
+    {
+      year,
+      month,
+      day: 1,
+      hour: 0,
+      minute: 0,
+      second: 0
+    },
+    timeZone
+  );
+  const next = nextMonth(year, month);
+  const nextFrom = zonedDateTimeToUtc(
+    {
+      year: next.year,
+      month: next.month,
+      day: 1,
+      hour: 0,
+      minute: 0,
+      second: 0
+    },
+    timeZone
+  );
+
+  return {
+    from,
+    to: new Date(nextFrom.getTime() - 1)
+  };
+}
+
+function hideFinancialKpisForManagers(response: DashboardResponse, role: AuthContext["role"]): DashboardResponse {
+  if (role !== "MANAGER") {
+    return response;
+  }
+
+  return {
+    ...response,
+    kpis: {
+      ...response.kpis,
+      paidRevenueCents: 0,
+      paidCostCents: 0,
+      grossProfitCents: 0,
+      accruedRevenueCents: 0,
+      confirmedExpensesCents: 0,
+      accruedCommissionsCents: 0,
+      paidCommissionsCents: 0,
+      payableCommissionsCents: 0,
+      netCashCents: 0,
+      averagePaidTicketCents: 0
+    },
+    resale: {
+      revenueCents: 0,
+      costCents: 0,
+      grossProfitCents: 0,
+      marginPercent: 0
+    }
+  };
+}
+
+export async function getDashboard(auth: AuthContext, query: DashboardQuery = {}): Promise<DashboardResponse> {
   if (!["OWNER", "ADMIN", "MANAGER"].includes(auth.role)) {
     throw new AuthError(apiErrorCodes.forbidden, "Forbidden", 403);
   }
 
-  const period = monthPeriod(new Date(), auth.user.organization.timezone);
+  const period = monthPeriodFromQuery(query, new Date(), auth.user.organization.timezone);
   const data = await getDashboardData(auth.organizationId, period);
 
   const paidRevenueCents = data.acceptedPayments.reduce((sum, payment) => sum + payment.amountCents, 0);
@@ -184,7 +249,7 @@ export async function getDashboard(auth: AuthContext): Promise<DashboardResponse
   );
   const netCashCents = paidRevenueCents - data.confirmedExpensesCents - commissionTotals.unpaidCents;
 
-  return {
+  const response: DashboardResponse = {
     period: {
       from: period.from.toISOString(),
       to: period.to.toISOString()
@@ -216,4 +281,6 @@ export async function getDashboard(auth: AuthContext): Promise<DashboardResponse
       count: group._count._all
     }))
   };
+
+  return hideFinancialKpisForManagers(response, auth.role);
 }

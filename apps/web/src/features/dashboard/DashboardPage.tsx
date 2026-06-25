@@ -1,10 +1,44 @@
-import { ClipboardList, PackagePlus, WalletCards } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight, ClipboardList, PackagePlus, Plus, WalletCards } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { DashboardResponse } from "@orchid/shared";
 
-import { authHeaders, money, percent, request, type Screen } from "../../app/app-core";
-import { GlassPanel, InlineStat, MetricCard, ResalePanel } from "../../app/ui";
+import { authHeaders, repairStatusOptions, request, type RepairStatus, type Screen } from "../../app/app-core";
+import { GhostButton, GlassPanel, InlineStat, MetricCard, PrimaryButton, StatusPill } from "../../app/ui";
+
+function currentMonthValue(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthFromSearch() {
+  const month = new URLSearchParams(window.location.search).get("month");
+
+  return month && /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? month : currentMonthValue();
+}
+
+function shiftMonth(value: string, delta: number) {
+  const [year, month] = value.split("-").map(Number);
+  const date = new Date(year, month - 1 + delta, 1);
+
+  return currentMonthValue(date);
+}
+
+function monthLabel(value: string) {
+  const [year, month] = value.split("-").map(Number);
+
+  return new Intl.DateTimeFormat("ru-RU", {
+    month: "long",
+    year: "numeric"
+  }).format(new Date(year, month - 1, 1));
+}
+
+function dashboardPath(month: string) {
+  return `/api/v1/analytics/dashboard?month=${month}`;
+}
+
+function countStatus(dashboard: DashboardResponse | null, status: RepairStatus) {
+  return dashboard?.repairsByStatus.find((item) => item.status === status)?.count ?? 0;
+}
 
 export function DashboardPage({
   accessToken,
@@ -13,120 +47,130 @@ export function DashboardPage({
   accessToken: string;
   navigate: (screen: Screen) => void;
 }) {
+  const [month, setMonth] = useState(monthFromSearch);
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const activeCount = countStatus(dashboard, "ACCEPTED") + countStatus(dashboard, "IN_PROGRESS");
+  const readyCount = countStatus(dashboard, "READY");
+  const issuedCount = countStatus(dashboard, "ISSUED");
+  const cancelledCount = countStatus(dashboard, "CANCELLED");
+  const statusCounts = useMemo(
+    () =>
+      repairStatusOptions.map((status) => ({
+        ...status,
+        count: countStatus(dashboard, status.value)
+      })),
+    [dashboard]
+  );
 
   useEffect(() => {
-    request<DashboardResponse>("/api/v1/analytics/dashboard", {
+    let cancelled = false;
+
+    setIsLoading(true);
+    request<DashboardResponse>(dashboardPath(month), {
       headers: authHeaders(accessToken)
     })
-      .then((response) => setDashboard(response))
-      .catch(() => setDashboard(null))
-      .finally(() => setIsLoading(false));
-  }, [accessToken]);
+      .then((response) => {
+        if (!cancelled) {
+          setDashboard(response);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDashboard(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      });
 
-  const grossMargin =
-    dashboard && dashboard.kpis.paidRevenueCents > 0
-      ? (dashboard.kpis.grossProfitCents / dashboard.kpis.paidRevenueCents) * 100
-      : 0;
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, month]);
+
+  function updateMonth(nextMonth: string) {
+    setMonth(nextMonth);
+    window.history.replaceState(null, "", nextMonth === currentMonthValue() ? "/" : `/?month=${nextMonth}`);
+  }
 
   return (
     <div className="grid gap-4">
-      <GlassPanel className="p-5 sm:p-7">
+      <GlassPanel className="p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-sm text-white/55">
-              {isLoading ? "Расчет показателей..." : "Доступный остаток"}
-            </p>
-            <strong className="mt-3 block text-5xl font-semibold tracking-normal sm:text-7xl">
-              {dashboard ? money(dashboard.kpis.netCashCents) : "—"}
-            </strong>
+            <p className="text-sm text-white/48">Работа мастерской</p>
+            <h2 className="mt-1 text-3xl font-semibold tracking-normal">Главная за {monthLabel(month)}</h2>
           </div>
-          <span className="rounded-full bg-mint/12 px-3 py-1 text-sm text-mint ring-1 ring-mint/25">
-            {dashboard ? `${dashboard.kpis.paidOrdersCount} оплачено` : "live"}
-          </span>
+          <div className="flex items-center gap-2">
+            <GhostButton aria-label="Предыдущий месяц" className="h-10 w-10 px-0" onClick={() => updateMonth(shiftMonth(month, -1))}>
+              <ChevronLeft aria-hidden="true" size={18} />
+            </GhostButton>
+            <GhostButton className="min-w-32 justify-center" onClick={() => updateMonth(currentMonthValue())}>
+              Этот месяц
+            </GhostButton>
+            <GhostButton aria-label="Следующий месяц" className="h-10 w-10 px-0" onClick={() => updateMonth(shiftMonth(month, 1))}>
+              <ChevronRight aria-hidden="true" size={18} />
+            </GhostButton>
+          </div>
         </div>
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <MetricCard
-            label="Оплаченная выручка"
-            tone="text-mint"
-            value={dashboard ? money(dashboard.kpis.paidRevenueCents) : "—"}
-          />
-          <MetricCard
-            label="Валовая прибыль"
-            tone="text-lime-200"
-            value={dashboard ? money(dashboard.kpis.grossProfitCents) : "—"}
-          />
-          <MetricCard label="Маржа" tone="text-sky-200" value={dashboard ? `${percent(grossMargin)}%` : "—"} />
-          <MetricCard
-            label="Комиссии к выплате"
-            tone="text-orchid"
-            value={dashboard ? money(dashboard.kpis.payableCommissionsCents) : "—"}
-          />
-          <MetricCard label="Заказов" tone="text-amber" value={dashboard ? String(dashboard.kpis.repairOrdersCount) : "—"} />
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <MetricCard label="Заказов" tone="text-mint" value={isLoading ? "..." : String(dashboard?.kpis.repairOrdersCount ?? 0)} />
+          <MetricCard label="В работе" value={isLoading ? "..." : String(activeCount)} />
+          <MetricCard label="Готовы" tone="text-[rgb(var(--status-honey-text))]" value={isLoading ? "..." : String(readyCount)} />
+          <MetricCard label="Выданы" tone="text-[rgb(var(--status-sage-text))]" value={isLoading ? "..." : String(issuedCount)} />
+          <MetricCard label="Отменены" tone="text-[rgb(var(--status-rose-text))]" value={isLoading ? "..." : String(cancelledCount)} />
         </div>
       </GlassPanel>
 
-      {dashboard ? (
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <GlassPanel className="p-5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-sm text-white/48">Денежный остаток</p>
-              <h3 className="mt-1 text-2xl font-semibold">Состав остатка</h3>
+              <p className="text-sm text-white/48">Статусы</p>
+              <h3 className="mt-1 text-2xl font-semibold">Состояние заказов</h3>
             </div>
-            <span className="rounded-full bg-white/[0.08] px-3 py-1 text-sm text-white/58 ring-1 ring-white/10">
-              кассовый метод
-            </span>
+            <StatusPill label={isLoading ? "Обновляем" : "Актуально"} tone={isLoading ? "neutral" : "sage"} />
           </div>
-          <div className="mt-5 grid gap-3 md:grid-cols-4">
-            <InlineStat label="Оплаты" tone="text-mint" value={money(dashboard.kpis.paidRevenueCents)} />
-            <InlineStat
-              label="Расходы"
-              tone="text-coral"
-              value={money(-dashboard.kpis.confirmedExpensesCents)}
-            />
-            <InlineStat
-              label="Комиссии"
-              tone="text-amber"
-              value={money(-dashboard.kpis.payableCommissionsCents)}
-            />
-            <InlineStat label="Остаток" tone="text-mint" value={money(dashboard.kpis.netCashCents)} />
+
+          <div className="mt-5 grid gap-2">
+            {statusCounts.map((status) => (
+              <div key={status.value} className="grid grid-cols-[minmax(0,1fr)_80px] items-center gap-3 border-t border-white/[0.07] py-3 first:border-t-0 first:pt-0">
+                <span className="truncate text-sm text-white/68">{status.label}</span>
+                <strong className="text-right text-lg tabular-nums text-white">{isLoading ? "..." : status.count}</strong>
+              </div>
+            ))}
           </div>
         </GlassPanel>
-      ) : null}
 
-      <ResalePanel dashboard={dashboard} />
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        {[
-          {
-            label: "Новый заказ",
-            icon: ClipboardList,
-            action: () => navigate({ section: "orders", view: "create" })
-          },
-          {
-            label: "Новый расход",
-            icon: WalletCards,
-            action: () => navigate({ section: "expenses", view: "create" })
-          },
-          {
-            label: "Каталог услуг",
-            icon: PackagePlus,
-            action: () => navigate({ section: "settings", view: "services" })
-          }
-        ].map((action) => (
-          <button
-            key={action.label}
-            className="group rounded-lg border border-white/[0.08] bg-panel/95 p-4 text-left shadow-glass transition-[background-color,border-color,box-shadow,transform] hover:border-mint/30 hover:bg-white/[0.075] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30 active:translate-y-px"
-            onClick={action.action}
-            type="button"
-          >
-            <span className="grid h-11 w-11 place-items-center rounded-md bg-white/[0.06] text-mint shadow-inner-glass ring-1 ring-white/10 transition-[background-color,color] group-hover:bg-mint group-hover:text-ink">
-              <action.icon aria-hidden="true" size={20} />
-            </span>
-            <span className="mt-4 block text-lg font-semibold">{action.label}</span>
-          </button>
-        ))}
+        <GlassPanel className="p-5">
+          <p className="text-sm text-white/48">Быстрые действия</p>
+          <div className="mt-4 grid gap-2">
+            <PrimaryButton className="justify-center" onClick={() => navigate({ section: "orders", view: "create" })}>
+              <Plus aria-hidden="true" size={17} />
+              Новый заказ
+            </PrimaryButton>
+            <GhostButton className="justify-center" onClick={() => navigate({ section: "orders", view: "list" })}>
+              <ClipboardList aria-hidden="true" size={17} />
+              Заказы
+            </GhostButton>
+            <GhostButton className="justify-center" onClick={() => navigate({ section: "expenses", view: "create" })}>
+              <WalletCards aria-hidden="true" size={17} />
+              Новый расход
+            </GhostButton>
+            <GhostButton className="justify-center" onClick={() => navigate({ section: "settings", view: "services" })}>
+              <PackagePlus aria-hidden="true" size={17} />
+              Услуги
+            </GhostButton>
+          </div>
+          <div className="mt-5 grid gap-2">
+            <InlineStat label="Оплаченных заказов" value={isLoading ? "..." : String(dashboard?.kpis.paidOrdersCount ?? 0)} />
+            <InlineStat label="Ожидают оплаты" value={isLoading ? "..." : String(dashboard?.kpis.unpaidOrdersCount ?? 0)} />
+          </div>
+        </GlassPanel>
       </div>
     </div>
   );

@@ -12,6 +12,7 @@ import { authRoutes } from "./modules/auth/routes.js";
 import { commissionRoutes } from "./modules/commissions/routes.js";
 import { customerRoutes } from "./modules/customers/routes.js";
 import { expenseRoutes } from "./modules/expenses/routes.js";
+import { financeRoutes } from "./modules/finance/routes.js";
 import { healthRoutes } from "./modules/health/routes.js";
 import { repairOrderRoutes } from "./modules/repair-orders/routes.js";
 import { serviceCatalogRoutes } from "./modules/service-catalog/routes.js";
@@ -78,6 +79,9 @@ export function buildApp() {
   });
   app.register(analyticsRoutes, {
     prefix: "/api/v1/analytics"
+  });
+  app.register(financeRoutes, {
+    prefix: "/api/v1/finance"
   });
   app.register(auditRoutes, {
     prefix: "/api/v1/audit"
