@@ -311,7 +311,7 @@ function AppShell({
               {canManageReferenceSettings(user) &&
               screen.section === "settings" &&
               screen.view === "members" ? (
-                <MembersSettingsPage accessToken={accessToken} navigate={navigate} />
+                <MembersSettingsPage accessToken={accessToken} navigate={navigate} user={user} />
               ) : null}
               {canManageReferenceSettings(user) &&
               screen.section === "settings" &&

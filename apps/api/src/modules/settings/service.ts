@@ -137,6 +137,18 @@ function assertCanManageMembers(auth: AuthContext) {
   }
 }
 
+function manageableMemberRoles(auth: AuthContext): Role[] {
+  if (auth.role === "OWNER") {
+    return [Role.OWNER, Role.ADMIN, Role.MANAGER, Role.MASTER];
+  }
+
+  if (auth.role === "ADMIN") {
+    return [Role.MANAGER, Role.MASTER];
+  }
+
+  return [];
+}
+
 export async function getOrganizationSettings(auth: AuthContext): Promise<OrganizationSettingsResponse> {
   assertCanReadSettings(auth);
 
@@ -337,7 +349,7 @@ export async function assertActiveExpenseCategory(organizationId: string, id: st
 export async function getMembers(auth: AuthContext): Promise<MemberListResponse> {
   assertCanManageMembers(auth);
 
-  const members = await listMasterMembers(auth.organizationId);
+  const members = await listMasterMembers(auth.organizationId, manageableMemberRoles(auth));
 
   return {
     items: members.map(toMemberResponse)
@@ -386,10 +398,15 @@ export async function addMember(auth: AuthContext, input: CreateMemberInput): Pr
 export async function editMember(auth: AuthContext, id: string, input: UpdateMemberInput): Promise<MemberResponse> {
   assertCanManageMembers(auth);
 
+  const manageableRoles = manageableMemberRoles(auth);
   const existing = await findMemberById(auth.organizationId, id);
 
-  if (!existing || existing.role !== Role.MASTER) {
-    throw new AuthError(apiErrorCodes.notFound, "Master not found", 404);
+  if (!existing || !manageableRoles.includes(existing.role)) {
+    throw new AuthError(apiErrorCodes.notFound, "Member not found", 404);
+  }
+
+  if (input.isActive === false && existing.id === auth.membershipId) {
+    throw new AuthError(apiErrorCodes.conflict, "You cannot deactivate your own account", 409);
   }
 
   if (input.email) {
@@ -408,7 +425,8 @@ export async function editMember(auth: AuthContext, id: string, input: UpdateMem
     email: input.email?.trim().toLowerCase(),
     phone: input.phone === undefined ? undefined : input.phone || null,
     commissionPercent: commissionPercentToDb(input.commissionPercent),
-    isActive: input.isActive
+    isActive: input.isActive,
+    manageableRoles
   });
   const after = toMemberResponse(member);
 
@@ -418,7 +436,7 @@ export async function editMember(auth: AuthContext, id: string, input: UpdateMem
     action: input.isActive === false ? "DELETE" : "UPDATE",
     beforeJson: before,
     afterJson: after,
-    comment: input.isActive === false ? "Master member deactivated" : "Master member updated"
+    comment: input.isActive === false ? "Member deactivated" : "Member updated"
   });
 
   return after;

@@ -1,7 +1,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
-import type { MemberListResponse, MemberResponse } from "@orchid/shared";
+import type { AuthUser, MemberListResponse, MemberResponse } from "@orchid/shared";
 
 import {
   authHeaders,
@@ -11,6 +11,7 @@ import {
   parsePercentInput,
   percent,
   request,
+  roleLabel,
   type Screen
 } from "../../app/app-core";
 import { ConfirmDialog, GhostButton, GlassPanel, PageToolbar, PrimaryButton, StatusPill, TextField } from "../../app/ui";
@@ -31,12 +32,22 @@ function memberDraft(member: MemberResponse): MemberDraft {
   };
 }
 
+function memberRoleLabel(role: MemberResponse["role"]) {
+  if (role === "OWNER") {
+    return "Владелец";
+  }
+
+  return roleLabel(role);
+}
+
 export function MembersSettingsPage({
   accessToken,
-  navigate
+  navigate,
+  user
 }: {
   accessToken: string;
   navigate: (screen: Screen) => void;
+  user: AuthUser;
 }) {
   const [members, setMembers] = useState<MemberResponse[]>([]);
   const [drafts, setDrafts] = useState<Record<string, MemberDraft>>({});
@@ -140,8 +151,9 @@ export function MembersSettingsPage({
 
     try {
       const commissionPercent = parsePercentInput(draft.commissionPercent);
+      const memberCommissionPercent = member.role === "MASTER" ? commissionPercent : null;
 
-      if (Number.isNaN(commissionPercent)) {
+      if (Number.isNaN(memberCommissionPercent)) {
         throw new Error("Invalid commission percent");
       }
 
@@ -152,7 +164,7 @@ export function MembersSettingsPage({
           name: draft.name,
           email: draft.email,
           phone: draft.phone || null,
-          commissionPercent,
+          commissionPercent: memberCommissionPercent,
           isActive
         })
       });
@@ -234,6 +246,8 @@ export function MembersSettingsPage({
           ) : null}
           {members.map((member) => {
             const draft = drafts[member.id] ?? memberDraft(member);
+            const isMaster = member.role === "MASTER";
+            const isCurrentUser = member.userId === user.id;
 
             return (
               <GlassPanel key={member.id} as="article" className="p-4">
@@ -241,10 +255,14 @@ export function MembersSettingsPage({
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-lg font-semibold">{member.name}</h3>
+                      <StatusPill label={memberRoleLabel(member.role)} tone={isMaster ? "mint" : "neutral"} />
                       <StatusPill label={member.isActive ? "Активен" : "Отключен"} tone={member.isActive ? "mint" : "neutral"} />
                     </div>
                     <p className="mt-1 text-sm text-white/45">
-                      {member.email} · комиссия {member.commissionPercent === null ? "не задана" : `${percent(member.commissionPercent)}%`}
+                      {member.email}
+                      {isMaster
+                        ? ` · комиссия ${member.commissionPercent === null ? "не задана" : `${percent(member.commissionPercent)}%`}`
+                        : null}
                     </p>
                   </div>
                 </div>
@@ -270,18 +288,24 @@ export function MembersSettingsPage({
                     type="tel"
                     value={draft.phone}
                   />
-                  <TextField
-                    inputMode="decimal"
-                    label="Комиссия, %"
-                    onChange={(event) => updateDraft(member.id, { commissionPercent: event.target.value })}
-                    value={draft.commissionPercent}
-                  />
+                  {isMaster ? (
+                    <TextField
+                      inputMode="decimal"
+                      label="Комиссия, %"
+                      onChange={(event) => updateDraft(member.id, { commissionPercent: event.target.value })}
+                      value={draft.commissionPercent}
+                    />
+                  ) : null}
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <PrimaryButton disabled={savingId === member.id} onClick={() => void saveMember(member)}>
                     {savingId === member.id ? "Сохраняем..." : "Сохранить"}
                   </PrimaryButton>
-                  {member.isActive ? (
+                  {isCurrentUser ? (
+                    <span className="inline-flex min-h-10 items-center rounded-md border border-white/[0.08] px-3 text-sm text-white/45">
+                      Это текущая учетная запись
+                    </span>
+                  ) : member.isActive ? (
                     <GhostButton disabled={savingId === member.id} onClick={() => setMemberToDeactivate(member)}>
                       <Trash2 size={16} />
                       Отключить

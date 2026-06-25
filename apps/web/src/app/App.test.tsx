@@ -288,6 +288,7 @@ describe("App", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(membersResponse));
     fireEvent.click(screen.getByRole("button", { name: /Мастера/ }));
     expect(await screen.findByRole("heading", { name: "Мастера" })).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("Manager 1")).toBeInTheDocument();
     expect(await screen.findByDisplayValue("Master 1")).toBeInTheDocument();
     expect(screen.getByText(/комиссия 30%/)).toBeInTheDocument();
     expectNoMojibake(baseElement);

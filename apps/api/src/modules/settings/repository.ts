@@ -157,11 +157,13 @@ const memberInclude = {
   user: true
 } satisfies Prisma.MembershipInclude;
 
-export async function listMasterMembers(organizationId: string) {
+export async function listMasterMembers(organizationId: string, roles: Role[] = [Role.MASTER]) {
   return prisma.membership.findMany({
     where: {
       organizationId,
-      role: Role.MASTER,
+      role: {
+        in: roles
+      },
       user: {
         isActive: true
       }
@@ -287,13 +289,16 @@ export async function updateMasterMember(data: {
   phone?: string | null;
   commissionPercent?: Prisma.Decimal | null;
   isActive?: boolean;
+  manageableRoles?: Role[];
 }) {
   return prisma.$transaction(async (tx) => {
     const existing = await tx.membership.findFirstOrThrow({
       where: {
         id: data.membershipId,
         organizationId: data.organizationId,
-        role: Role.MASTER
+        role: {
+          in: data.manageableRoles ?? [Role.MASTER]
+        }
       },
       include: {
         user: true

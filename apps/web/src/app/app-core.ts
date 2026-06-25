@@ -91,7 +91,11 @@ export function canManageReferenceSettings(user: Pick<AuthUser, "role">) {
 }
 
 export function roleLabel(role: AuthUser["role"]) {
-  if (role === "OWNER" || role === "ADMIN") {
+  if (role === "OWNER") {
+    return "Владелец";
+  }
+
+  if (role === "ADMIN") {
     return "Админ";
   }
 
@@ -578,6 +582,27 @@ export function dateTime(value: string | null) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(new Date(value));
+}
+
+export function dateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+export function recentDateRange(days: number, today = new Date()) {
+  const to = new Date(today);
+  to.setHours(0, 0, 0, 0);
+
+  const from = new Date(to);
+  from.setDate(from.getDate() - Math.max(days - 1, 0));
+
+  return {
+    from: dateInputValue(from),
+    to: dateInputValue(to)
+  };
 }
 
 export function shortId(value: string) {

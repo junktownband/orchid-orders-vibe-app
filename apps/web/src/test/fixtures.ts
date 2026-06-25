@@ -242,6 +242,18 @@ export const repairOrderAuditResponse = {
 export const membersResponse = {
   items: [
     {
+      id: "member-manager",
+      userId: "user-manager",
+      name: "Manager 1",
+      email: "manager@orchid.local",
+      phone: "+7 (900) 000-00-03",
+      role: "MANAGER",
+      commissionPercent: null,
+      isActive: true,
+      createdAt: "2026-05-29T08:00:00.000Z",
+      updatedAt: "2026-05-29T08:00:00.000Z"
+    },
+    {
       id: "member-2",
       userId: "user-2",
       name: "Master 1",

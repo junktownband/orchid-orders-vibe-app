@@ -10,7 +10,7 @@ import type {
   MasterListResponse
 } from "@orchid/shared";
 
-import { authHeaders, dateTime, displayOrderNumber, money, percent, request } from "../../app/app-core";
+import { authHeaders, dateTime, displayOrderNumber, money, percent, recentDateRange, request } from "../../app/app-core";
 import {
   ConfirmDialog,
   GhostButton,
@@ -45,17 +45,18 @@ type BulkPayoutTarget = {
   items: MasterCommissionResponse[];
 };
 
-const emptyFilters: PayoutFilters = {
-  masterMembershipId: "",
-  payoutStatus: "UNPAID",
-  from: "",
-  to: ""
-};
-
 const payoutStatusOptions: Array<{ value: CommissionPayoutStatus; label: string }> = [
   { value: "UNPAID", label: "К выплате" },
   { value: "PAID", label: "Выплачено" }
 ];
+
+function defaultPayoutFilters(): PayoutFilters {
+  return {
+    masterMembershipId: "",
+    payoutStatus: "UNPAID",
+    ...recentDateRange(60)
+  };
+}
 
 function pathForCommissionFilters(filters: PayoutFilters) {
   const params = new URLSearchParams();
@@ -108,14 +109,15 @@ function searchForPayoutFilters(filters: PayoutFilters) {
 function payoutFiltersFromSearch(search: string): PayoutFilters {
   const params = new URLSearchParams(search);
   const payoutStatus = params.get("payoutStatus");
+  const defaults = defaultPayoutFilters();
 
   return {
     masterMembershipId: params.get("masterMembershipId") ?? "",
     payoutStatus: payoutStatusOptions.some((option) => option.value === payoutStatus)
       ? (payoutStatus as CommissionPayoutStatus)
-      : emptyFilters.payoutStatus,
-    from: params.get("from") ?? "",
-    to: params.get("to") ?? ""
+      : defaults.payoutStatus,
+    from: params.get("from") ?? defaults.from,
+    to: params.get("to") ?? defaults.to
   };
 }
 
@@ -149,11 +151,13 @@ function groupCommissions(commissions: MasterCommissionListResponse | null): Com
 }
 
 function hasActiveFilters(filters: PayoutFilters) {
+  const defaults = defaultPayoutFilters();
+
   return (
-    filters.masterMembershipId !== emptyFilters.masterMembershipId ||
-    filters.payoutStatus !== emptyFilters.payoutStatus ||
-    filters.from !== emptyFilters.from ||
-    filters.to !== emptyFilters.to
+    filters.masterMembershipId !== defaults.masterMembershipId ||
+    filters.payoutStatus !== defaults.payoutStatus ||
+    filters.from !== defaults.from ||
+    filters.to !== defaults.to
   );
 }
 
@@ -169,8 +173,18 @@ function CommissionTable({
   onMarkPaid: (commission: MasterCommissionResponse) => void;
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-white/[0.08] bg-black/15 shadow-inner-glass">
-      <table aria-label="Реестр комиссий" className="w-full min-w-[980px] border-collapse text-left text-sm">
+    <div className="w-full max-w-full overflow-x-auto rounded-lg border border-white/[0.08] bg-black/15 shadow-inner-glass">
+      <table aria-label="Реестр комиссий" className="w-full min-w-[780px] table-fixed border-collapse text-left text-sm">
+        <colgroup>
+          <col className="w-[12%]" />
+          <col className="w-[20%]" />
+          <col className="w-[13%]" />
+          <col className="w-[13%]" />
+          <col className="w-[12%]" />
+          <col className="w-[10%]" />
+          <col className="w-[10%]" />
+          <col className="w-[10%]" />
+        </colgroup>
         <thead className="bg-white/[0.055] text-xs uppercase text-white/42">
           <tr>
             <th className="px-3 py-3 font-medium" scope="col">
@@ -203,19 +217,19 @@ function CommissionTable({
           {items.map((commission) => (
             <tr key={commission.id} className="align-top">
               <td className="px-3 py-3 text-white/72">
-                <div className="font-medium text-white">{displayOrderNumber(commission.repairOrderNumber)}</div>
+                <div className="truncate font-medium text-white">{displayOrderNumber(commission.repairOrderNumber)}</div>
                 <div className="mt-1 text-xs text-white/40">
                   {commission.issuedAt ? `Закрыт ${dateTime(commission.issuedAt)}` : "Дата выдачи не указана"}
                 </div>
               </td>
               <td className="px-3 py-3">
-                <div className="max-w-[220px] truncate font-medium text-white">{commission.repairOrderItemName}</div>
+                <div className="truncate font-medium text-white">{commission.repairOrderItemName}</div>
                 <div className="mt-1 text-xs text-white/40">
                   Начислено {commission.commissionCalculatedAt ? dateTime(commission.commissionCalculatedAt) : "—"}
                 </div>
               </td>
-              <td className="px-3 py-3 text-white/62">{commission.masterName ?? "Мастер не выбран"}</td>
-              <td className="px-3 py-3 text-white/62">{commission.customerName ?? "Клиент не указан"}</td>
+              <td className="truncate px-3 py-3 text-white/62">{commission.masterName ?? "Мастер не выбран"}</td>
+              <td className="truncate px-3 py-3 text-white/62">{commission.customerName ?? "Клиент не указан"}</td>
               <td className="px-3 py-3">
                 <StatusPill
                   label={commission.commissionPayoutStatus === "PAID" ? "Выплачено" : "К выплате"}
@@ -239,7 +253,7 @@ function CommissionTable({
               <td className="px-3 py-3 text-right">
                 {canManage && commission.commissionPayoutStatus === "UNPAID" ? (
                   <PrimaryButton
-                    className="h-10 px-3"
+                    className="h-9 px-2 text-xs"
                     disabled={payingCommissionId === commission.id}
                     onClick={() => onMarkPaid(commission)}
                     type="button"
@@ -427,7 +441,7 @@ export function AnalyticsPage({ accessToken, user }: { accessToken: string; user
       </div>
 
       <GlassPanel className="mt-4 p-4">
-        <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto_auto_auto]">
+        <div className="grid gap-3 lg:grid-cols-[minmax(180px,1fr)_minmax(150px,0.7fr)_minmax(150px,0.7fr)_minmax(150px,0.7fr)_auto]">
           <SelectField
             disabled={isMastersLoading}
             label="Мастер"
@@ -469,7 +483,7 @@ export function AnalyticsPage({ accessToken, user }: { accessToken: string; user
             <GhostButton
               className="w-full"
               disabled={!hasActiveFilters(filters)}
-              onClick={() => updateFilters(emptyFilters)}
+              onClick={() => updateFilters(defaultPayoutFilters())}
               type="button"
             >
               Сбросить
@@ -478,7 +492,7 @@ export function AnalyticsPage({ accessToken, user }: { accessToken: string; user
         </div>
       </GlassPanel>
 
-      <GlassPanel className="mt-4 p-5">
+      <GlassPanel className="mt-4 min-w-0 overflow-hidden p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-sm text-white/48">Реестр</p>
@@ -515,14 +529,14 @@ export function AnalyticsPage({ accessToken, user }: { accessToken: string; user
 
         <div className="mt-4 grid gap-4">
           {commissionGroups.map((group) => (
-            <section key={group.key} className="rounded-lg bg-white/[0.045] p-4 ring-1 ring-white/[0.08]">
-              <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
+            <section key={group.key} className="min-w-0 rounded-lg bg-white/[0.045] p-4 ring-1 ring-white/[0.08]">
+              <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(320px,460px)] lg:items-start">
                 <div>
                   <p className="text-sm text-white/48">Мастер</p>
                   <h4 className="mt-1 text-xl font-semibold">{group.masterName}</h4>
                   <p className="mt-1 text-sm text-white/42">Позиций: {group.items.length}</p>
                 </div>
-                <div className="grid gap-3 lg:min-w-[460px]">
+                <div className="grid min-w-0 gap-3">
                   <div className="grid gap-2 sm:grid-cols-3">
                     <InlineStat label="Начислено" tone="text-mint" value={money(group.accruedCents)} />
                     <InlineStat label="Выплачено" value={money(group.paidCents)} />
@@ -545,7 +559,7 @@ export function AnalyticsPage({ accessToken, user }: { accessToken: string; user
                   ) : null}
                 </div>
               </div>
-              <div className="mt-3">
+              <div className="mt-3 min-w-0">
                 <CommissionTable
                   canManage={canManageCommissions}
                   items={group.items}
