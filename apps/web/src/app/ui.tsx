@@ -7,6 +7,7 @@ import type {
   TextareaHTMLAttributes
 } from "react";
 import { useId } from "react";
+import { createPortal } from "react-dom";
 
 import type { DashboardResponse } from "@orchid/shared";
 
@@ -15,8 +16,9 @@ import { marginPercentFrom, money, percent, type OrderWarning } from "./app-core
 export function Background({ children }: { children: ReactNode }) {
   return (
     <main className="h-dvh min-h-dvh overflow-y-auto overflow-x-hidden bg-ink text-white">
-      <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(180deg,#111514_0%,#121614_50%,#0d0f0e_100%)]" />
-      <div className="pointer-events-none fixed inset-x-0 top-0 h-px bg-white/15" />
+      <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(180deg,#020710_0%,#061225_52%,#01050d_100%)]" />
+      <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.07)_0%,rgba(255,255,255,0)_30%,rgba(159,207,212,0.025)_100%)]" />
+      <div className="pointer-events-none fixed inset-x-0 top-0 h-px bg-white/12" />
       {children}
     </main>
   );
@@ -33,7 +35,7 @@ export function GlassPanel({
 }) {
   return (
     <Component
-      className={`relative rounded-lg border border-white/[0.08] bg-panel/95 shadow-glass backdrop-blur-xl ${className}`}
+      className={`relative rounded-xl border border-white/[0.12] bg-panel/72 shadow-glass backdrop-blur-[28px] ${className}`}
     >
       {children}
     </Component>
@@ -57,7 +59,7 @@ export function TextField({
   const describedBy = [props["aria-describedby"], errorId].filter(Boolean).join(" ") || undefined;
 
   return (
-    <div className="grid gap-2 text-sm text-white/62">
+    <div className="grid min-w-0 gap-2 text-sm text-white/62">
       <label htmlFor={fieldId}>{label}</label>
       <input
         {...props}
@@ -65,7 +67,7 @@ export function TextField({
         autoComplete={autoComplete ?? "off"}
         aria-describedby={describedBy}
         aria-invalid={error ? true : props["aria-invalid"]}
-        className={`h-11 rounded-md border ${error ? "border-coral/70 focus-visible:border-coral/70 focus-visible:ring-coral/25" : "border-white/10 focus-visible:border-mint/60 focus-visible:ring-mint/25"} bg-white/[0.055] px-3 text-white outline-none shadow-inner-glass transition-[background-color,border-color,box-shadow] placeholder:text-white/30 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+        className={`h-11 w-full min-w-0 rounded-lg border ${error ? "border-coral/70 focus-visible:border-coral/70 focus-visible:ring-coral/25" : "border-white/[0.12] focus-visible:border-mint/60 focus-visible:ring-mint/25"} bg-white/[0.07] px-3 text-white outline-none shadow-inner-glass transition-[background-color,border-color,box-shadow] placeholder:text-white/30 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
         name={name ?? label}
       />
       {error ? (
@@ -94,7 +96,7 @@ export function TextAreaField({
   const describedBy = [props["aria-describedby"], errorId].filter(Boolean).join(" ") || undefined;
 
   return (
-    <div className="grid gap-2 text-sm text-white/62">
+    <div className="grid min-w-0 gap-2 text-sm text-white/62">
       <label htmlFor={fieldId}>{label}</label>
       <textarea
         {...props}
@@ -102,7 +104,7 @@ export function TextAreaField({
         autoComplete={autoComplete ?? "off"}
         aria-describedby={describedBy}
         aria-invalid={error ? true : props["aria-invalid"]}
-        className={`min-h-28 resize-y rounded-md border ${error ? "border-coral/70 focus-visible:border-coral/70 focus-visible:ring-coral/25" : "border-white/10 focus-visible:border-mint/60 focus-visible:ring-mint/25"} bg-white/[0.055] px-3 py-3 text-white outline-none shadow-inner-glass transition-[background-color,border-color,box-shadow] placeholder:text-white/30 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+        className={`min-h-28 w-full min-w-0 resize-y rounded-lg border ${error ? "border-coral/70 focus-visible:border-coral/70 focus-visible:ring-coral/25" : "border-white/[0.12] focus-visible:border-mint/60 focus-visible:ring-mint/25"} bg-white/[0.07] px-3 py-3 text-white outline-none shadow-inner-glass transition-[background-color,border-color,box-shadow] placeholder:text-white/30 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
         name={name ?? label}
       />
       {error ? (
@@ -132,14 +134,14 @@ export function SelectField({
   const describedBy = [props["aria-describedby"], errorId].filter(Boolean).join(" ") || undefined;
 
   return (
-    <div className="grid gap-2 text-sm text-white/62">
+    <div className="grid min-w-0 gap-2 text-sm text-white/62">
       <label htmlFor={fieldId}>{label}</label>
       <select
         {...props}
         id={fieldId}
         aria-describedby={describedBy}
         aria-invalid={error ? true : props["aria-invalid"]}
-        className={`h-11 rounded-md border ${error ? "border-coral/70 focus-visible:border-coral/70 focus-visible:ring-coral/25" : "border-white/10 focus-visible:border-mint/60 focus-visible:ring-mint/25"} bg-white/[0.055] px-3 text-white outline-none shadow-inner-glass transition-[background-color,border-color,box-shadow] focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+        className={`h-11 w-full min-w-0 rounded-lg border ${error ? "border-coral/70 focus-visible:border-coral/70 focus-visible:ring-coral/25" : "border-white/[0.12] focus-visible:border-mint/60 focus-visible:ring-mint/25"} bg-white/[0.07] px-3 text-white outline-none shadow-inner-glass transition-[background-color,border-color,box-shadow] focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
         name={name ?? label}
       >
         {children}
@@ -164,7 +166,7 @@ export function PrimaryButton({
   return (
     <button
       {...props}
-      className={`inline-flex h-11 touch-manipulation items-center justify-center gap-2 rounded-md bg-mint px-4 text-sm font-semibold text-ink shadow-command transition-[background-color,box-shadow,transform] hover:bg-[#9ff5e4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/40 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+      className={`inline-flex h-11 touch-manipulation items-center justify-center gap-2 rounded-lg bg-mint px-4 text-sm font-semibold text-ink shadow-command transition-[background-color,box-shadow,transform] hover:bg-mint/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/40 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
       type={type}
     >
       {children}
@@ -183,12 +185,20 @@ export function GhostButton({
   return (
     <button
       {...props}
-      className={`inline-flex h-11 touch-manipulation items-center justify-center gap-2 rounded-md border border-white/10 bg-white/[0.055] px-4 text-sm text-white shadow-inner-glass transition-[background-color,border-color,box-shadow,transform] hover:border-white/18 hover:bg-white/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-35 ${className}`}
+      className={`inline-flex h-11 touch-manipulation items-center justify-center gap-2 rounded-lg border border-white/[0.12] bg-white/[0.065] px-4 text-sm text-white shadow-inner-glass transition-[background-color,border-color,box-shadow,transform] hover:border-white/[0.2] hover:bg-white/[0.105] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-35 ${className}`}
       type={type}
     >
       {children}
     </button>
   );
+}
+
+export function ModalLayer({ children }: { children: ReactNode }) {
+  if (typeof document === "undefined") {
+    return <>{children}</>;
+  }
+
+  return createPortal(children, document.body);
 }
 
 export function ConfirmDialog({
@@ -213,11 +223,12 @@ export function ConfirmDialog({
   const titleId = useId();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto overscroll-contain bg-black/55 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur-sm sm:items-center sm:p-6">
+    <ModalLayer>
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto overscroll-contain bg-black/62 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur-md sm:items-center sm:p-6">
       <section
         aria-labelledby={titleId}
         aria-modal="true"
-        className="flex max-h-[calc(100dvh_-_1.5rem_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] w-full max-w-lg flex-col rounded-lg border border-white/[0.1] bg-panel p-5 text-white shadow-glass sm:max-h-[calc(100dvh_-_3rem)]"
+        className="flex max-h-[calc(100dvh_-_1.5rem_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] w-full max-w-lg flex-col rounded-xl border border-white/[0.12] bg-panel/80 p-5 text-white shadow-glass backdrop-blur-[28px] sm:max-h-[calc(100dvh_-_3rem)]"
         role="dialog"
       >
         <h2 className="shrink-0 text-xl font-semibold" id={titleId}>
@@ -231,7 +242,9 @@ export function ConfirmDialog({
             {cancelLabel}
           </GhostButton>
           <PrimaryButton
-            className={destructive ? "bg-coral text-white hover:bg-[#ff8d7e] focus-visible:ring-coral/35" : ""}
+            className={
+              destructive ? "bg-coral text-white hover:bg-coral/90 focus-visible:ring-coral/35" : ""
+            }
             disabled={isBusy}
             onClick={onConfirm}
           >
@@ -240,6 +253,7 @@ export function ConfirmDialog({
         </div>
       </section>
     </div>
+    </ModalLayer>
   );
 }
 
@@ -257,13 +271,23 @@ export function MetricCard({
   return (
     <GlassPanel as="div" className="p-4">
       <p className="text-xs uppercase text-white/42">{label}</p>
-      <p className={`mt-2 break-words text-2xl font-semibold tabular-nums tracking-normal ${tone}`}>{value}</p>
+      <p className={`mt-2 break-words text-2xl font-semibold tabular-nums tracking-normal ${tone}`}>
+        {value}
+      </p>
       {hint ? <p className="mt-2 text-xs leading-5 text-white/45">{hint}</p> : null}
     </GlassPanel>
   );
 }
 
-export function InlineStat({ label, value, tone = "text-white" }: { label: string; value: string; tone?: string }) {
+export function InlineStat({
+  label,
+  value,
+  tone = "text-white"
+}: {
+  label: string;
+  value: string;
+  tone?: string;
+}) {
   return (
     <div className="rounded-md border border-white/[0.08] bg-white/[0.045] p-3 shadow-inner-glass">
       <p className="text-xs uppercase text-white/40">{label}</p>
@@ -288,7 +312,11 @@ export function StatusPill({
           ? "bg-coral/14 text-coral ring-coral/25"
           : "bg-white/[0.08] text-white/72 ring-white/10";
 
-  return <span className={`inline-flex rounded-full px-3 py-1 text-sm ring-1 ${toneClass}`}>{label}</span>;
+  return (
+    <span className={`inline-flex rounded-full px-3 py-1 text-sm ring-1 ${toneClass}`}>
+      {label}
+    </span>
+  );
 }
 
 export function MarginPreview({
@@ -315,7 +343,9 @@ export function MarginPreview({
         </div>
         <span
           className={`rounded-full px-3 py-1 text-sm ring-1 ${
-            profitCents < 0 ? "bg-coral/14 text-coral ring-coral/25" : "bg-mint/12 text-mint ring-mint/25"
+            profitCents < 0
+              ? "bg-coral/14 text-coral ring-coral/25"
+              : "bg-mint/12 text-mint ring-mint/25"
           }`}
         >
           {percent(margin)}%
@@ -360,9 +390,17 @@ export function ResalePanel({ dashboard }: { dashboard: DashboardResponse | null
         </span>
       </div>
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        <MetricCard label="Выручка" tone="text-amber" value={resale ? money(resale.revenueCents) : "—"} />
+        <MetricCard
+          label="Выручка"
+          tone="text-amber"
+          value={resale ? money(resale.revenueCents) : "—"}
+        />
         <MetricCard label="Себестоимость" value={resale ? money(resale.costCents) : "—"} />
-        <MetricCard label="Прибыль" tone="text-mint" value={resale ? money(resale.grossProfitCents) : "—"} />
+        <MetricCard
+          label="Прибыль"
+          tone="text-mint"
+          value={resale ? money(resale.grossProfitCents) : "—"}
+        />
       </div>
     </GlassPanel>
   );
@@ -389,7 +427,9 @@ export function PageToolbar({
         ) : null}
         <div>
           <h2 className="text-2xl font-semibold tracking-normal">{title}</h2>
-          {count !== undefined ? <p className="mt-1 text-sm text-white/45">Записей: {count}</p> : null}
+          {count !== undefined ? (
+            <p className="mt-1 text-sm text-white/45">Записей: {count}</p>
+          ) : null}
         </div>
       </div>
       {action}

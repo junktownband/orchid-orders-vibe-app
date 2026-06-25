@@ -1,4 +1,4 @@
-import { LayoutGrid, List, Plus } from "lucide-react";
+import { ChevronRight, LayoutGrid, List, Plus, SlidersHorizontal } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { RepairOrderResponse, RepairOrdersListResponse } from "@orchid/shared";
@@ -18,15 +18,30 @@ import {
   request,
   requestPathForOrders,
   serviceTypeLabel,
-  shortId,
   type Navigate,
   type OrdersListQuery,
   type PaymentStatus,
   type RepairStatus
 } from "../../app/app-core";
-import { GhostButton, GlassPanel, PageToolbar, PrimaryButton, SelectField, TextField, WarningPill } from "../../app/ui";
+import {
+  GhostButton,
+  GlassPanel,
+  PageToolbar,
+  PrimaryButton,
+  SelectField,
+  TextField,
+  WarningPill
+} from "../../app/ui";
 
 type OrdersViewMode = "compact" | "cards";
+
+function orderHeadline(order: RepairOrderResponse) {
+  return order.instrumentName || order.customerName || displayOrderNumber(order.orderNumber);
+}
+
+function orderOpenLabel(order: RepairOrderResponse) {
+  return `${orderHeadline(order)} ${displayOrderNumber(order.orderNumber)} ${repairStatusLabel(order.repairStatus)} ${paymentStatusLabel(order.paymentStatus)}`;
+}
 
 function ViewModeButton({
   isActive,
@@ -44,7 +59,9 @@ function ViewModeButton({
       aria-label={label}
       aria-pressed={isActive}
       className={`inline-flex h-10 touch-manipulation items-center justify-center gap-2 rounded-md px-3 text-sm transition-[background-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30 ${
-        isActive ? "bg-mint text-ink shadow-command" : "bg-white/[0.055] text-white/68 ring-1 ring-white/10 hover:bg-white/[0.09]"
+        isActive
+          ? "bg-mint text-ink shadow-command"
+          : "bg-white/[0.055] text-white/68 ring-1 ring-white/10 hover:bg-white/[0.09]"
       }`}
       onClick={onClick}
       title={label}
@@ -57,30 +74,36 @@ function ViewModeButton({
 
 function OrderCompactRow({
   canManageOrders,
-  navigate,
+  onOpen,
   order
 }: {
   canManageOrders: boolean;
-  navigate: Navigate;
+  onOpen: () => void;
   order: RepairOrderResponse;
 }) {
   const warnings = orderWarnings(order);
   const customerLine = [order.customerName, order.customerPhone].filter(Boolean).join(" · ");
 
   return (
-    <GlassPanel as="article" className="p-3">
+    <button
+      aria-label={orderOpenLabel(order)}
+      className="group relative block w-full rounded-lg border border-white/[0.12] bg-panel/72 p-3 text-left text-white shadow-glass backdrop-blur-[26px] transition-[background-color,border-color,box-shadow,transform] hover:border-white/[0.18] hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/35 active:translate-y-px"
+      onClick={onOpen}
+      title={`Открыть ${displayOrderNumber(order.orderNumber)}`}
+      type="button"
+    >
       <div className="grid gap-3 lg:grid-cols-[minmax(220px,1.35fr)_minmax(180px,1fr)_minmax(170px,0.9fr)_auto] lg:items-center">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-base font-medium">
-              {order.instrumentName || order.customerName || displayOrderNumber(order.orderNumber)}
-            </h3>
+            <h3 className="truncate text-base font-medium">{orderHeadline(order)}</h3>
             <span className="rounded-full bg-white/[0.08] px-2.5 py-1 text-xs text-white/65 ring-1 ring-white/10">
               {displayOrderNumber(order.orderNumber)}
             </span>
           </div>
           <p className="mt-1 truncate text-sm text-white/48">{order.description}</p>
-          {customerLine ? <p className="mt-1 truncate text-xs text-white/42">{customerLine}</p> : null}
+          {customerLine ? (
+            <p className="mt-1 truncate text-xs text-white/42">{customerLine}</p>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <span className="rounded-full bg-white/[0.08] px-3 py-1 text-sm text-white/72 ring-1 ring-white/10">
@@ -111,16 +134,12 @@ function OrderCompactRow({
               <p className="text-xs text-white/40">маржа {money(order.grossProfitCents)}</p>
             </div>
           ) : null}
-          <GhostButton
-            className="h-10 px-3"
-            onClick={() => navigate({ section: "orders", view: "detail", orderId: order.id })}
-            type="button"
-          >
-            К заказу
-          </GhostButton>
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-white/[0.08] bg-white/[0.045] text-white/45 shadow-inner-glass transition-[background-color,color] group-hover:bg-white/[0.075] group-hover:text-white">
+            <ChevronRight aria-hidden="true" size={18} />
+          </span>
         </div>
       </div>
-    </GlassPanel>
+    </button>
   );
 }
 
@@ -143,6 +162,9 @@ export function OrdersListPage({
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [viewMode, setViewMode] = useState<OrdersViewMode>("compact");
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(
+    Boolean(query.repairStatus || query.paymentStatus)
+  );
   const [error, setError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const queryKey = useMemo(
@@ -196,9 +218,12 @@ export function OrdersListPage({
     setError(null);
 
     try {
-      const response = await request<RepairOrdersListResponse>(requestPathForOrders(query, nextCursor), {
-        headers: authHeaders(accessToken)
-      });
+      const response = await request<RepairOrdersListResponse>(
+        requestPathForOrders(query, nextCursor),
+        {
+          headers: authHeaders(accessToken)
+        }
+      );
 
       setOrders((current) => {
         const seen = new Set(current.map((order) => order.id));
@@ -239,11 +264,16 @@ export function OrdersListPage({
   }, [hasMore, loadMore]);
 
   function updateQuery(patch: Partial<OrdersListQuery>, options?: { replace?: boolean }) {
-    onQueryChange({
-      ...query,
-      ...patch
-    }, options);
+    onQueryChange(
+      {
+        ...query,
+        ...patch
+      },
+      options
+    );
   }
+
+  const hasAdvancedFilters = Boolean(query.repairStatus || query.paymentStatus);
 
   return (
     <div>
@@ -251,11 +281,19 @@ export function OrdersListPage({
         action={
           <div className="flex flex-wrap justify-end gap-2">
             <div className="flex rounded-lg bg-black/10 p-1 ring-1 ring-white/[0.08]">
-              <ViewModeButton isActive={viewMode === "compact"} label="Компактный список" onClick={() => setViewMode("compact")}>
+              <ViewModeButton
+                isActive={viewMode === "compact"}
+                label="Компактный список"
+                onClick={() => setViewMode("compact")}
+              >
                 <List aria-hidden="true" size={16} />
                 Компактно
               </ViewModeButton>
-              <ViewModeButton isActive={viewMode === "cards"} label="Карточки заказов" onClick={() => setViewMode("cards")}>
+              <ViewModeButton
+                isActive={viewMode === "cards"}
+                label="Карточки заказов"
+                onClick={() => setViewMode("cards")}
+              >
                 <LayoutGrid aria-hidden="true" size={16} />
                 Карточки
               </ViewModeButton>
@@ -272,40 +310,57 @@ export function OrdersListPage({
         title="Заказы"
       />
 
-      <GlassPanel className="mb-4 p-4">
+      <GlassPanel className="mb-4 p-3 sm:p-4">
         <div className="grid gap-3">
-          <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto]">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
             <TextField
               label="Поиск"
               onChange={(event) => updateQuery({ q: event.target.value }, { replace: true })}
               placeholder="Клиент, телефон, инструмент, номер, мастер"
               value={query.q}
             />
-            <SelectField
-              label="Статус ремонта"
-              onChange={(event) => updateQuery({ repairStatus: event.target.value as RepairStatus | "" })}
-              value={query.repairStatus}
+            <GhostButton
+              aria-expanded={showAdvancedFilters}
+              className={`justify-center ${hasAdvancedFilters ? "border-mint/25 bg-mint/10 text-mint" : ""}`}
+              onClick={() => setShowAdvancedFilters((value) => !value)}
+              type="button"
             >
-              <option value="">Любой</option>
-              {repairStatusOptions.map((status) => (
-                <option key={status.value} value={status.value}>
-                  {status.label}
-                </option>
-              ))}
-            </SelectField>
-            <SelectField
-              label="Оплата"
-              onChange={(event) => updateQuery({ paymentStatus: event.target.value as PaymentStatus | "" })}
-              value={query.paymentStatus}
-            >
-              <option value="">Любая</option>
-              {paymentStatusOptions.map((status) => (
-                <option key={status.value} value={status.value}>
-                  {status.label}
-                </option>
-              ))}
-            </SelectField>
+              <SlidersHorizontal aria-hidden="true" size={16} />
+              Фильтры
+            </GhostButton>
           </div>
+          {showAdvancedFilters ? (
+            <div className="grid gap-3 border-t border-white/[0.08] pt-3 md:grid-cols-2">
+              <SelectField
+                label="Статус ремонта"
+                onChange={(event) =>
+                  updateQuery({ repairStatus: event.target.value as RepairStatus | "" })
+                }
+                value={query.repairStatus}
+              >
+                <option value="">Любой</option>
+                {repairStatusOptions.map((status) => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
+                ))}
+              </SelectField>
+              <SelectField
+                label="Оплата"
+                onChange={(event) =>
+                  updateQuery({ paymentStatus: event.target.value as PaymentStatus | "" })
+                }
+                value={query.paymentStatus}
+              >
+                <option value="">Любая</option>
+                {paymentStatusOptions.map((status) => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
+                ))}
+              </SelectField>
+            </div>
+          ) : null}
           <div className="flex gap-2 overflow-x-auto pb-1">
             {orderTabOptions.map((tab) => (
               <button
@@ -328,7 +383,9 @@ export function OrdersListPage({
 
       <div className="mt-4 grid gap-3">
         {error ? <p className="rounded-lg bg-coral/12 p-4 text-coral">{error}</p> : null}
-        {isLoadingInitial ? <p className="rounded-lg bg-white/[0.07] p-4 text-white/55">Загружаем заказы...</p> : null}
+        {isLoadingInitial ? (
+          <p className="rounded-lg bg-white/[0.07] p-4 text-white/55">Загружаем заказы...</p>
+        ) : null}
         {!isLoadingInitial && orders.length === 0 ? (
           <GlassPanel className="p-5">
             <p className="text-white/62">Заказы не найдены.</p>
@@ -339,99 +396,120 @@ export function OrdersListPage({
               <OrderCompactRow
                 key={order.id}
                 canManageOrders={canManageOrders}
-                navigate={navigate}
+                onOpen={() => navigate({ section: "orders", view: "detail", orderId: order.id })}
                 order={order}
               />
             ))
           : null}
-        {viewMode === "cards" ? orders.map((order) => {
-          const warnings = orderWarnings(order);
-          const customerLine = [order.customerName, order.customerPhone].filter(Boolean).join(" · ");
+        {viewMode === "cards" ? (
+          <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3 min-[1800px]:grid-cols-4">
+            {orders.map((order) => {
+              const warnings = orderWarnings(order);
+              const customerLine = [order.customerName, order.customerPhone]
+                .filter(Boolean)
+                .join(" · ");
 
-          return (
-            <GlassPanel key={order.id} as="article" className="p-4">
-              <div className="grid gap-4 xl:grid-cols-[1fr_auto]">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-lg font-medium">{order.instrumentName || order.customerName || displayOrderNumber(order.orderNumber)}</h3>
-                    <span className="rounded-full bg-white/[0.08] px-3 py-1 text-xs text-white/65 ring-1 ring-white/10">
-                      {displayOrderNumber(order.orderNumber)}
-                    </span>
-                    <span className="rounded-full bg-white/[0.08] px-3 py-1 text-xs text-white/55 ring-1 ring-white/10">
-                      ID {shortId(order.id)}
-                    </span>
-                    <span className="rounded-full bg-white/[0.08] px-3 py-1 text-xs text-white/65 ring-1 ring-white/10">
-                      {paymentStatusLabel(order.paymentStatus)}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm text-white/48">{order.description}</p>
-                  {customerLine ? <p className="mt-2 text-xs text-white/44">{customerLine}</p> : null}
-                  <p className="mt-2 text-xs text-white/42">
-                    Ответственный: {order.assignedMasterName ?? "не выбран"}
-                    {order.paidByName ? ` · оплату принял ${order.paidByName}` : ""}
-                  </p>
-                  <p className="mt-1 text-xs text-white/38">
-                    Создан: {dateTime(order.createdAt)}
-                    {order.issuedAt ? ` · закрыт: ${dateTime(order.issuedAt)}` : ""}
-                  </p>
-                  {warnings.length > 0 ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {warnings.map((warning) => (
-                        <WarningPill key={warning.text} warning={warning} />
-                      ))}
+              return (
+                <button
+                  key={order.id}
+                  aria-label={orderOpenLabel(order)}
+                  className="group flex h-full w-full flex-col rounded-lg border border-white/[0.12] bg-panel/72 p-4 text-left text-white shadow-glass backdrop-blur-[26px] transition-[background-color,border-color,box-shadow,transform] hover:border-white/[0.18] hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/35 active:translate-y-px"
+                  onClick={() => navigate({ section: "orders", view: "detail", orderId: order.id })}
+                  title={`Открыть ${displayOrderNumber(order.orderNumber)}`}
+                  type="button"
+                >
+                  <div className="grid gap-4">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="min-w-0 truncate text-lg font-medium">{orderHeadline(order)}</h3>
+                        <span className="rounded-full bg-white/[0.08] px-3 py-1 text-xs text-white/65 ring-1 ring-white/10">
+                          {displayOrderNumber(order.orderNumber)}
+                        </span>
+                        <span className="rounded-full bg-white/[0.08] px-3 py-1 text-xs text-white/65 ring-1 ring-white/10">
+                          {paymentStatusLabel(order.paymentStatus)}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm leading-5 text-white/48">{order.description}</p>
+                      {customerLine ? (
+                        <p className="mt-2 text-xs text-white/44">{customerLine}</p>
+                      ) : null}
+                      <p className="mt-2 text-xs text-white/42">
+                        Ответственный: {order.assignedMasterName ?? "не выбран"}
+                        {order.paidByName ? ` · оплату принял ${order.paidByName}` : ""}
+                      </p>
+                      <p className="mt-1 text-xs text-white/38">
+                        Создан: {dateTime(order.createdAt)}
+                        {order.issuedAt ? ` · закрыт: ${dateTime(order.issuedAt)}` : ""}
+                      </p>
+                      {warnings.length > 0 ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {warnings.map((warning) => (
+                            <WarningPill key={warning.text} warning={warning} />
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
-                  ) : null}
-                </div>
-                {canManageOrders ? (
-                  <div className="text-left xl:text-right">
-                    <p className="text-2xl font-semibold">{money(order.totalAmountCents)}</p>
-                    <p className="text-sm text-white/45">
-                      Себестоимость {money(order.totalCostCents)} · маржа {money(order.grossProfitCents)}
-                    </p>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="mt-4 grid gap-2">
-                {order.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="grid gap-2 rounded-lg bg-black/15 px-3 py-2 text-sm shadow-inner-glass ring-1 ring-white/[0.08] sm:grid-cols-[1fr_auto]"
-                  >
-                    <span className="min-w-0 truncate">
-                      {item.name} · {serviceTypeLabel(item.type)}
-                    </span>
                     {canManageOrders ? (
-                      <span className="text-white/68">
-                        {money(item.priceCents)} / себ. {money(item.costCents)}
-                      </span>
+                      <div className="text-left">
+                        <p className="text-2xl font-semibold">{money(order.totalAmountCents)}</p>
+                        <p className="text-sm text-white/45">
+                          Себестоимость {money(order.totalCostCents)} · маржа{" "}
+                          {money(order.grossProfitCents)}
+                        </p>
+                      </div>
                     ) : null}
                   </div>
-                ))}
-              </div>
 
-              <div className="mt-4 flex flex-wrap justify-between gap-2">
-                <span className="rounded-full bg-white/[0.08] px-3 py-2 text-sm text-white/72 ring-1 ring-white/10">
-                  {repairStatusLabel(order.repairStatus)}
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  <GhostButton onClick={() => navigate({ section: "orders", view: "detail", orderId: order.id })} type="button">
-                    К заказу
-                  </GhostButton>
-                </div>
-              </div>
-            </GlassPanel>
-          );
-        }) : null}
+                  <div className="mt-4 grid flex-1 gap-2">
+                    {order.items.map((item) => (
+                      <div
+                        key={item.id}
+                        className="grid gap-1 rounded-lg bg-black/18 px-3 py-2 text-sm shadow-inner-glass ring-1 ring-white/[0.09]"
+                      >
+                        <span className="min-w-0 truncate">
+                          {item.name} · {serviceTypeLabel(item.type)}
+                        </span>
+                        {canManageOrders ? (
+                          <span className="text-white/68">
+                            {money(item.priceCents)} / себ. {money(item.costCents)}
+                          </span>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap justify-between gap-2">
+                    <span className="rounded-full bg-white/[0.08] px-3 py-2 text-sm text-white/72 ring-1 ring-white/10">
+                      {repairStatusLabel(order.repairStatus)}
+                    </span>
+                    <span className="inline-flex h-10 items-center gap-2 rounded-md border border-white/[0.08] bg-white/[0.045] px-3 text-sm text-white/48 shadow-inner-glass transition-[background-color,color] group-hover:bg-white/[0.075] group-hover:text-white">
+                      Открыть
+                      <ChevronRight aria-hidden="true" size={16} />
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
         <div ref={sentinelRef} />
-        {isLoadingMore ? <p className="rounded-lg bg-white/[0.07] p-4 text-white/55">Загружаем еще...</p> : null}
+        {isLoadingMore ? (
+          <p className="rounded-lg bg-white/[0.07] p-4 text-white/55">Загружаем еще...</p>
+        ) : null}
         {!isLoadingInitial && hasMore ? (
-          <GhostButton className="w-full" disabled={isLoadingMore} onClick={() => void loadMore()} type="button">
+          <GhostButton
+            className="w-full"
+            disabled={isLoadingMore}
+            onClick={() => void loadMore()}
+            type="button"
+          >
             Загрузить еще
           </GhostButton>
         ) : null}
         {!isLoadingInitial && orders.length > 0 && !hasMore ? (
-          <p className="rounded-lg bg-white/[0.045] p-3 text-center text-sm text-white/42">Больше заказов нет.</p>
+          <p className="rounded-lg bg-white/[0.045] p-3 text-center text-sm text-white/42">
+            Больше заказов нет.
+          </p>
         ) : null}
       </div>
     </div>

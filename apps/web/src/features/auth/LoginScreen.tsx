@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
+import { LogIn } from "lucide-react";
 import { type FormEvent, useState } from "react";
 
 import type { AuthResponse } from "@orchid/shared";
@@ -39,33 +40,31 @@ export function LoginScreen({ onLogin }: { onLogin: (response: AuthResponse) => 
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: shouldReduceMotion ? 0 : 0.28, ease: "easeOut" }}
           onSubmit={handleSubmit}
-          className="rounded-lg border border-white/[0.08] bg-panel/95 p-6 shadow-glass backdrop-blur-xl"
+          className="relative overflow-hidden rounded-2xl border border-white/[0.12] bg-panel/76 p-5 shadow-glass backdrop-blur-2xl sm:p-7"
         >
-          <div className="mb-8">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/25" />
+          <div className="mb-7">
             <p className="text-sm text-white/55">Вход в мастерскую</p>
             <h1 className="mt-2 text-4xl font-semibold tracking-normal">Orchid Control</h1>
           </div>
 
-          <TextField
-            autoComplete="email"
-            label="Email"
-            onChange={(event) => setEmail(event.target.value)}
-            type="email"
-            value={email}
-          />
+          <div className="grid gap-4">
+            <TextField
+              autoComplete="email"
+              label="Email"
+              onChange={(event) => setEmail(event.target.value)}
+              type="email"
+              value={email}
+            />
 
-          <TextField
-            autoComplete="current-password"
-            className="mt-2"
-            label="Пароль"
-            onChange={(event) => setPassword(event.target.value)}
-            type="password"
-            value={password}
-          />
-
-          {import.meta.env.DEV ? (
-            <p className="mt-3 text-xs text-white/45">Dev пароль после seed: orchid12345</p>
-          ) : null}
+            <TextField
+              autoComplete="current-password"
+              label="Пароль"
+              onChange={(event) => setPassword(event.target.value)}
+              type="password"
+              value={password}
+            />
+          </div>
 
           {error ? (
             <p aria-live="polite" className="mt-4 text-sm text-coral">
@@ -74,7 +73,14 @@ export function LoginScreen({ onLogin }: { onLogin: (response: AuthResponse) => 
           ) : null}
 
           <PrimaryButton className="mt-7 w-full" disabled={isSubmitting} type="submit">
-            {isSubmitting ? "Входим..." : "Войти"}
+            {isSubmitting ? (
+              "Входим..."
+            ) : (
+              <>
+                <LogIn aria-hidden="true" size={17} />
+                Войти
+              </>
+            )}
           </PrimaryButton>
         </motion.form>
       </section>

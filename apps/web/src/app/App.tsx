@@ -34,49 +34,79 @@ import { Background } from "./ui";
 import { LoginScreen } from "../features/auth/LoginScreen";
 
 const DashboardPage = lazy(() =>
-  import("../features/dashboard/DashboardPage").then(({ DashboardPage }) => ({ default: DashboardPage }))
+  import("../features/dashboard/DashboardPage").then(({ DashboardPage }) => ({
+    default: DashboardPage
+  }))
 );
 const OrdersListPage = lazy(() =>
-  import("../features/orders/OrdersListPage").then(({ OrdersListPage }) => ({ default: OrdersListPage }))
+  import("../features/orders/OrdersListPage").then(({ OrdersListPage }) => ({
+    default: OrdersListPage
+  }))
 );
 const OrderCreatePage = lazy(() =>
-  import("../features/orders/OrderCreatePage").then(({ OrderCreatePage }) => ({ default: OrderCreatePage }))
+  import("../features/orders/OrderCreatePage").then(({ OrderCreatePage }) => ({
+    default: OrderCreatePage
+  }))
 );
 const OrderDetailPage = lazy(() =>
-  import("../features/orders/OrderDetailPage").then(({ OrderDetailPage }) => ({ default: OrderDetailPage }))
+  import("../features/orders/OrderDetailPage").then(({ OrderDetailPage }) => ({
+    default: OrderDetailPage
+  }))
 );
 const IssueOrderPage = lazy(() =>
-  import("../features/orders/IssueOrderPage").then(({ IssueOrderPage }) => ({ default: IssueOrderPage }))
+  import("../features/orders/IssueOrderPage").then(({ IssueOrderPage }) => ({
+    default: IssueOrderPage
+  }))
 );
 const ExpensesListPage = lazy(() =>
-  import("../features/expenses/ExpensesPages").then(({ ExpensesListPage }) => ({ default: ExpensesListPage }))
+  import("../features/expenses/ExpensesPages").then(({ ExpensesListPage }) => ({
+    default: ExpensesListPage
+  }))
 );
 const ExpenseCreatePage = lazy(() =>
-  import("../features/expenses/ExpensesPages").then(({ ExpenseCreatePage }) => ({ default: ExpenseCreatePage }))
+  import("../features/expenses/ExpensesPages").then(({ ExpenseCreatePage }) => ({
+    default: ExpenseCreatePage
+  }))
 );
 const AnalyticsPage = lazy(() =>
-  import("../features/analytics/AnalyticsPage").then(({ AnalyticsPage }) => ({ default: AnalyticsPage }))
+  import("../features/analytics/AnalyticsPage").then(({ AnalyticsPage }) => ({
+    default: AnalyticsPage
+  }))
 );
 const SettingsProfilePage = lazy(() =>
-  import("../features/settings/SettingsProfilePage").then(({ SettingsProfilePage }) => ({ default: SettingsProfilePage }))
+  import("../features/settings/SettingsProfilePage").then(({ SettingsProfilePage }) => ({
+    default: SettingsProfilePage
+  }))
 );
 const TaxSettingsPage = lazy(() =>
-  import("../features/settings/TaxSettingsPage").then(({ TaxSettingsPage }) => ({ default: TaxSettingsPage }))
+  import("../features/settings/TaxSettingsPage").then(({ TaxSettingsPage }) => ({
+    default: TaxSettingsPage
+  }))
 );
 const AuditLogPage = lazy(() =>
-  import("../features/settings/AuditLogPage").then(({ AuditLogPage }) => ({ default: AuditLogPage }))
+  import("../features/settings/AuditLogPage").then(({ AuditLogPage }) => ({
+    default: AuditLogPage
+  }))
 );
 const MembersSettingsPage = lazy(() =>
-  import("../features/settings/MembersSettingsPage").then(({ MembersSettingsPage }) => ({ default: MembersSettingsPage }))
+  import("../features/settings/MembersSettingsPage").then(({ MembersSettingsPage }) => ({
+    default: MembersSettingsPage
+  }))
 );
 const ReferenceSettingsPage = lazy(() =>
-  import("../features/settings/ReferenceSettingsPages").then(({ ReferenceSettingsPage }) => ({ default: ReferenceSettingsPage }))
+  import("../features/settings/ReferenceSettingsPages").then(({ ReferenceSettingsPage }) => ({
+    default: ReferenceSettingsPage
+  }))
 );
 const ServicesListPage = lazy(() =>
-  import("../features/settings/ServicesPages").then(({ ServicesListPage }) => ({ default: ServicesListPage }))
+  import("../features/settings/ServicesPages").then(({ ServicesListPage }) => ({
+    default: ServicesListPage
+  }))
 );
 const ServiceCreatePage = lazy(() =>
-  import("../features/settings/ServicesPages").then(({ ServiceCreatePage }) => ({ default: ServiceCreatePage }))
+  import("../features/settings/ServicesPages").then(({ ServiceCreatePage }) => ({
+    default: ServiceCreatePage
+  }))
 );
 
 function ScreenLoading() {
@@ -96,7 +126,9 @@ function AppShell({
   accessToken: string;
   onLogout: () => void;
 }) {
-  const [locationKey, setLocationKey] = useState(() => `${window.location.pathname}${window.location.search}`);
+  const [locationKey, setLocationKey] = useState(
+    () => `${window.location.pathname}${window.location.search}`
+  );
   const rawScreen = useMemo(() => screenFromLocation(window.location), [locationKey]);
   const screen = useMemo(() => screenForUser(user, rawScreen), [rawScreen, user]);
   const ordersQuery = useMemo(() => ordersQueryFromSearch(window.location.search), [locationKey]);
@@ -118,35 +150,44 @@ function AppShell({
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  const navigate = useCallback<Navigate>((nextScreen, options) => {
-    const path = pathForScreen(nextScreen);
-    const search = nextScreen.section === "orders" && nextScreen.view === "list" ? searchForOrdersQuery(ordersQuery) : "";
-    const nextUrl = `${path}${search}`;
+  const navigate = useCallback<Navigate>(
+    (nextScreen, options) => {
+      const path = pathForScreen(nextScreen);
+      const search =
+        nextScreen.section === "orders" && nextScreen.view === "list"
+          ? searchForOrdersQuery(ordersQuery)
+          : "";
+      const nextUrl = `${path}${search}`;
 
-    if (nextUrl === `${window.location.pathname}${window.location.search}`) {
-      return;
-    }
+      if (nextUrl === `${window.location.pathname}${window.location.search}`) {
+        return;
+      }
 
-    if (options?.replace) {
-      window.history.replaceState(null, "", nextUrl);
-    } else {
-      window.history.pushState(null, "", nextUrl);
-    }
+      if (options?.replace) {
+        window.history.replaceState(null, "", nextUrl);
+      } else {
+        window.history.pushState(null, "", nextUrl);
+      }
 
-    setLocationKey(nextUrl);
-  }, [ordersQuery]);
+      setLocationKey(nextUrl);
+    },
+    [ordersQuery]
+  );
 
-  const updateOrdersQuery = useCallback((nextQuery: OrdersListQuery, options?: { replace?: boolean }) => {
-    const nextUrl = `/orders${searchForOrdersQuery(nextQuery)}`;
+  const updateOrdersQuery = useCallback(
+    (nextQuery: OrdersListQuery, options?: { replace?: boolean }) => {
+      const nextUrl = `/orders${searchForOrdersQuery(nextQuery)}`;
 
-    if (options?.replace) {
-      window.history.replaceState(null, "", nextUrl);
-    } else {
-      window.history.pushState(null, "", nextUrl);
-    }
+      if (options?.replace) {
+        window.history.replaceState(null, "", nextUrl);
+      } else {
+        window.history.pushState(null, "", nextUrl);
+      }
 
-    setLocationKey(nextUrl);
-  }, []);
+      setLocationKey(nextUrl);
+    },
+    []
+  );
 
   useEffect(() => {
     const safePath = pathForScreen(screen);
@@ -174,17 +215,23 @@ function AppShell({
             <div className="min-w-0">
               <div className="lg:hidden">
                 <p className="text-sm text-white/48">{user.organization.name}</p>
-                <h1 className="text-2xl font-semibold tracking-normal sm:text-3xl">Orchid Control</h1>
+                <h1 className="text-2xl font-semibold tracking-normal sm:text-3xl">
+                  Orchid Control
+                </h1>
                 <p className="mt-1 text-sm text-white/42">{title}</p>
               </div>
               <div className="hidden lg:block">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/35">Раздел</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/35">
+                  Раздел
+                </p>
                 <p className="mt-2 text-3xl font-semibold tracking-normal text-white">{title}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden min-w-0 text-right sm:block">
-                <p className="max-w-48 truncate text-sm font-medium text-white">{user.name ?? user.email}</p>
+                <p className="max-w-48 truncate text-sm font-medium text-white">
+                  {user.name ?? user.email}
+                </p>
                 <p className="mt-1 text-xs text-white/42">{roleLabel(user.role)}</p>
               </div>
               <button
@@ -206,7 +253,9 @@ function AppShell({
             className="mt-6 lg:mt-8"
           >
             <Suspense fallback={<ScreenLoading />}>
-              {canUseBackOffice && screen.section === "dashboard" ? <DashboardPage accessToken={accessToken} navigate={navigate} /> : null}
+              {canUseBackOffice && screen.section === "dashboard" ? (
+                <DashboardPage accessToken={accessToken} navigate={navigate} />
+              ) : null}
               {screen.section === "orders" && screen.view === "list" ? (
                 <OrdersListPage
                   accessToken={accessToken}
@@ -230,15 +279,26 @@ function AppShell({
                 />
               ) : null}
               {canManageOrderFlows && screen.section === "orders" && screen.view === "issue" ? (
-                <IssueOrderPage accessToken={accessToken} navigate={navigate} orderId={screen.orderId} />
+                <IssueOrderPage
+                  accessToken={accessToken}
+                  navigate={navigate}
+                  orderId={screen.orderId}
+                />
               ) : null}
               {canUseBackOffice && screen.section === "expenses" && screen.view === "list" ? (
                 <ExpensesListPage accessToken={accessToken} navigate={navigate} />
               ) : null}
               {canUseBackOffice && screen.section === "expenses" && screen.view === "create" ? (
-                <ExpenseCreatePage accessToken={accessToken} itemId={screen.itemId} navigate={navigate} orderId={screen.orderId} />
+                <ExpenseCreatePage
+                  accessToken={accessToken}
+                  itemId={screen.itemId}
+                  navigate={navigate}
+                  orderId={screen.orderId}
+                />
               ) : null}
-              {canUseBackOffice && screen.section === "analytics" ? <AnalyticsPage accessToken={accessToken} user={user} /> : null}
+              {canUseBackOffice && screen.section === "analytics" ? (
+                <AnalyticsPage accessToken={accessToken} user={user} />
+              ) : null}
               {canUseBackOffice && screen.section === "settings" && screen.view === "profile" ? (
                 <SettingsProfilePage user={user} navigate={navigate} onLogout={handleLogout} />
               ) : null}
@@ -248,26 +308,42 @@ function AppShell({
               {canUseBackOffice && screen.section === "settings" && screen.view === "audit" ? (
                 <AuditLogPage accessToken={accessToken} navigate={navigate} />
               ) : null}
-              {canManageReferenceSettings(user) && screen.section === "settings" && screen.view === "members" ? (
+              {canManageReferenceSettings(user) &&
+              screen.section === "settings" &&
+              screen.view === "members" ? (
                 <MembersSettingsPage accessToken={accessToken} navigate={navigate} />
               ) : null}
-              {canManageReferenceSettings(user) && screen.section === "settings" && screen.view === "payment-methods" ? (
-                <ReferenceSettingsPage accessToken={accessToken} kind="payment-methods" navigate={navigate} />
+              {canManageReferenceSettings(user) &&
+              screen.section === "settings" &&
+              screen.view === "payment-methods" ? (
+                <ReferenceSettingsPage
+                  accessToken={accessToken}
+                  kind="payment-methods"
+                  navigate={navigate}
+                />
               ) : null}
-              {canManageReferenceSettings(user) && screen.section === "settings" && screen.view === "expense-categories" ? (
-                <ReferenceSettingsPage accessToken={accessToken} kind="expense-categories" navigate={navigate} />
+              {canManageReferenceSettings(user) &&
+              screen.section === "settings" &&
+              screen.view === "expense-categories" ? (
+                <ReferenceSettingsPage
+                  accessToken={accessToken}
+                  kind="expense-categories"
+                  navigate={navigate}
+                />
               ) : null}
               {canUseBackOffice && screen.section === "settings" && screen.view === "services" ? (
                 <ServicesListPage accessToken={accessToken} navigate={navigate} />
               ) : null}
-              {canUseBackOffice && screen.section === "settings" && screen.view === "service-create" ? (
+              {canUseBackOffice &&
+              screen.section === "settings" &&
+              screen.view === "service-create" ? (
                 <ServiceCreatePage accessToken={accessToken} navigate={navigate} />
               ) : null}
             </Suspense>
           </motion.div>
         </section>
 
-        <nav className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-10 flex w-[min(92vw,640px)] -translate-x-1/2 flex-col rounded-lg border border-white/[0.08] bg-panel/95 p-2 shadow-glass backdrop-blur-xl lg:bottom-0 lg:left-0 lg:top-0 lg:h-dvh lg:w-72 lg:translate-x-0 lg:rounded-none lg:border-y-0 lg:border-l-0 lg:bg-[#111513]/96 lg:p-5 lg:shadow-none">
+        <nav className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-10 flex w-[min(92vw,640px)] -translate-x-1/2 flex-col rounded-lg border border-white/[0.08] bg-panel/92 p-2 shadow-glass backdrop-blur-xl lg:bottom-0 lg:left-0 lg:top-0 lg:h-dvh lg:w-72 lg:translate-x-0 lg:rounded-none lg:border-y-0 lg:border-l-0 lg:bg-panel/96 lg:p-5 lg:shadow-none">
           <div className="hidden lg:block">
             <p className="text-sm text-white/46">{user.organization.name}</p>
             <p className="mt-2 text-2xl font-semibold tracking-normal text-white">Orchid Control</p>
@@ -292,7 +368,9 @@ function AppShell({
                 type="button"
               >
                 <item.icon aria-hidden="true" size={19} />
-                <span className="block max-w-full truncate text-[10px] leading-none sm:text-[11px] lg:text-sm lg:leading-5">{item.label}</span>
+                <span className="block max-w-full truncate text-[10px] leading-none sm:text-[11px] lg:text-sm lg:leading-5">
+                  {item.label}
+                </span>
               </button>
             ))}
           </div>
@@ -328,7 +406,9 @@ function OrchidApp() {
       })
       .catch(async () => {
         const storedSession = readStoredAuthSession();
-        const validatedSession = storedSession ? await validateStoredAuthSession(storedSession) : null;
+        const validatedSession = storedSession
+          ? await validateStoredAuthSession(storedSession)
+          : null;
 
         if (!cancelled) {
           if (validatedSession) {

@@ -80,6 +80,33 @@ describe("App", () => {
   });
 
   it("logs in and switches bottom navigation pages", async () => {
+    const repairOrderWithCatalogItem = {
+      ...repairOrdersResponse.items[0],
+      balanceDueCents: 2600000,
+      grossProfitCents: 2490000,
+      items: [
+        ...repairOrdersResponse.items[0].items,
+        {
+          assignedMasterMembershipId: "member-1",
+          assignedMasterName: "Owner",
+          commissionAmountCents: null,
+          commissionBaseCents: null,
+          commissionCalculatedAt: null,
+          commissionPaidAt: null,
+          commissionPaidByName: null,
+          commissionPayoutStatus: "UNPAID",
+          commissionPercentSnapshot: null,
+          costCents: 50000,
+          id: "item-3",
+          name: "Полная проточка ладов",
+          priceCents: 600000,
+          serviceCatalogItemId: "service-1",
+          type: "SERVICE"
+        }
+      ],
+      totalAmountCents: 2600000,
+      totalCostCents: 110000
+    };
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(jsonResponse({}, { status: 401 }))
@@ -90,6 +117,8 @@ describe("App", () => {
       .mockResolvedValueOnce(jsonResponse(mastersResponse))
       .mockResolvedValueOnce(jsonResponse(paymentMethodsResponse))
       .mockResolvedValueOnce(jsonResponse(serviceCatalogResponse))
+      .mockResolvedValueOnce(jsonResponse(repairOrderAuditResponse))
+      .mockResolvedValueOnce(jsonResponse(repairOrderWithCatalogItem))
       .mockResolvedValueOnce(jsonResponse(repairOrderAuditResponse))
       .mockResolvedValueOnce(jsonResponse(updatedCustomerResponse))
       .mockResolvedValueOnce(jsonResponse(paidRepairOrder))
@@ -120,21 +149,67 @@ describe("App", () => {
     expect(screen.getByLabelText("Заказы")).toHaveAttribute("aria-current", "page");
     expect(await screen.findByText("Fender Stratocaster")).toBeInTheDocument();
     expect(await screen.findByText("Есть товар без себестоимости")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "К заказу" }));
+    fireEvent.click(screen.getByRole("button", { name: /Fender Stratocaster.*№ 00001/ }));
     expect(await screen.findByRole("heading", { name: "№ 00001" })).toBeInTheDocument();
     expectNoMojibake(baseElement);
     expect(screen.getByRole("button", { name: "Выдать заказ" })).toBeInTheDocument();
-    expect(screen.getByText("Состояние заказа")).toBeInTheDocument();
+    expect(screen.getByText("Состояние")).toBeInTheDocument();
     expect(await screen.findByText("Журнал действий")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Полная проточка ладов/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Добавить позицию" }));
+    expect(screen.getByRole("heading", { name: "Добавить позицию" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Найти стандартную услугу")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Полная проточка ладов/ }));
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: "Добавить позицию" })).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("Полная проточка ладов")).toBeInTheDocument();
+    await waitFor(
+      () => {
+        expect(fetchMock).toHaveBeenCalledWith(
+          "/api/v1/repair-orders/repair-1/items",
+          expect.objectContaining({
+            method: "PUT"
+          })
+        );
+      },
+      { timeout: 2_500 }
+    );
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.filter(([url]) => url === "/api/v1/repair-orders/repair-1/audit")
+          .length
+      ).toBeGreaterThanOrEqual(2);
+    });
+    expect(screen.queryByRole("button", { name: "Сохранить заказ" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Сохранено")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Редактировать" }));
     fireEvent.change(await screen.findByLabelText("Имя клиента"), {
       target: {
         value: "Петр"
       }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить клиента" }));
+    expect(screen.queryByRole("button", { name: "Сохранить клиента" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Сохранено")).not.toBeInTheDocument();
+    await waitFor(
+      () => {
+        expect(fetchMock).toHaveBeenCalledWith(
+          "/api/v1/customers/customer-1",
+          expect.objectContaining({
+            body: JSON.stringify({
+              name: "Петр",
+              phone: "+7 (999) 123-45-67",
+              email: "ivan@example.test",
+              note: "Постоянный клиент"
+            }),
+            method: "PATCH"
+          })
+        );
+      },
+      { timeout: 2_500 }
+    );
     expect((await screen.findAllByText("Петр")).length).toBeGreaterThan(0);
-    expect(screen.getByText("Финальное действие")).toBeInTheDocument();
+    expect(screen.getByText("Действия")).toBeInTheDocument();
     const markPaidButton = screen.getByRole("button", { name: "Принять оплату" });
     expect(markPaidButton).toBeDefined();
     fireEvent.click(markPaidButton as HTMLElement);
@@ -144,7 +219,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: "Принять оплату" })).not.toBeInTheDocument();
     });
-    expect(screen.getByText("Оплата принята. Требуется выдача.")).toBeInTheDocument();
+    expect(screen.getAllByText("Оплачен").length).toBeGreaterThan(0);
 
     fetchMock
       .mockResolvedValueOnce(jsonResponse(repairOrdersResponse))
@@ -154,7 +229,9 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Новый заказ" }));
     expect(await screen.findByText("Итог заказа")).toBeInTheDocument();
     expectNoMojibake(baseElement);
-    expect(await screen.findByRole("button", { name: /Полная проточка ладов/ })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /Полная проточка ладов/ })
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Нестандартная услуга" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Добавить запчасть" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Добавить струны" })).not.toBeInTheDocument();
@@ -180,14 +257,18 @@ describe("App", () => {
     expectNoMojibake(baseElement);
     expect(screen.getByRole("button", { name: "Новый расход" })).toBeInTheDocument();
 
-    fetchMock.mockResolvedValueOnce(jsonResponse(mastersResponse)).mockResolvedValueOnce(jsonResponse(commissionsResponse));
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(mastersResponse))
+      .mockResolvedValueOnce(jsonResponse(commissionsResponse));
     fireEvent.click(screen.getByLabelText("Выплаты"));
     expect(await screen.findByRole("heading", { name: "Выплаты мастерам" })).toBeInTheDocument();
     expectNoMojibake(baseElement);
     expect(await screen.findByText("Реестр комиссий")).toBeInTheDocument();
     expect(screen.getByLabelText("Мастер")).toBeInTheDocument();
     expect(screen.getByLabelText("Начислено с")).toBeInTheDocument();
-    expect(screen.queryByText("Следить за маржей по работам и перепродаваемым позициям отдельно.")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Следить за маржей по работам и перепродаваемым позициям отдельно.")
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText("Настройки"));
     expect(await screen.findByRole("heading", { name: "Настройки" })).toBeInTheDocument();
@@ -197,7 +278,9 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "Журнал" })).toBeInTheDocument();
     const auditEvent = await screen.findByRole("article");
     expect(within(auditEvent).getByText("Статус заказа")).toBeInTheDocument();
-    expect(within(auditEvent).getByText(/Repair order status changed to READY/)).toBeInTheDocument();
+    expect(
+      within(auditEvent).getByText(/Repair order status changed to READY/)
+    ).toBeInTheDocument();
     expectNoMojibake(baseElement);
     fireEvent.click(screen.getByLabelText("Назад"));
     expect(await screen.findByRole("heading", { name: "Настройки" })).toBeInTheDocument();
@@ -261,11 +344,9 @@ describe("App", () => {
 
     const statusSelect = await screen.findByLabelText("Статус");
     expect(statusSelect).toBeEnabled();
-    expect(Array.from((statusSelect as HTMLSelectElement).options).map((option) => option.value)).toEqual([
-      "ACCEPTED",
-      "IN_PROGRESS",
-      "READY"
-    ]);
+    expect(
+      Array.from((statusSelect as HTMLSelectElement).options).map((option) => option.value)
+    ).toEqual(["ACCEPTED", "IN_PROGRESS", "READY"]);
     expect(within(statusSelect).queryByRole("option", { name: "Выдан" })).not.toBeInTheDocument();
     expect(within(statusSelect).queryByRole("option", { name: "Отменен" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Принять оплату" })).not.toBeInTheDocument();
@@ -323,9 +404,13 @@ describe("App", () => {
     expect(within(payoutTable).getByRole("columnheader", { name: "Заказ" })).toBeInTheDocument();
     expect(within(payoutTable).getByRole("columnheader", { name: "Мастер" })).toBeInTheDocument();
     expect(within(payoutTable).getByRole("columnheader", { name: "База" })).toBeInTheDocument();
-    expect(within(payoutTable).getByRole("columnheader", { name: "К выплате" })).toBeInTheDocument();
+    expect(
+      within(payoutTable).getByRole("columnheader", { name: "К выплате" })
+    ).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "Оплатить выборку" }));
-    expect(screen.getByRole("heading", { name: "Подтвердить массовую выплату?" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Подтвердить массовую выплату?" })
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Создать выплаты" }));
 
     await waitFor(() => {
@@ -406,7 +491,7 @@ describe("App", () => {
 
     fireEvent.click(await screen.findByLabelText("Заказы"));
     await screen.findByText("Fender Stratocaster");
-    fireEvent.click(screen.getByRole("button", { name: "К заказу" }));
+    fireEvent.click(screen.getByRole("button", { name: /Fender Stratocaster.*№ 00001/ }));
     expect(await screen.findByRole("heading", { name: "№ 00001" })).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("Добавить расход к позиции Отстройка"));
     expect(await screen.findByRole("heading", { name: "Расход по заказу" })).toBeInTheDocument();

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   AuditLogListResponse,
@@ -30,6 +30,20 @@ import { ConfirmDialog, GlassPanel, PageToolbar, TextAreaField } from "../../app
 import { OrderItemsPanel, OrderSidePanel, PaymentConfirmDialog } from "./OrderDetailPanels";
 
 type OrderPayment = RepairOrderResponse["payments"][number];
+type AutosaveState = "idle" | "saving" | "saved";
+
+function draftItemsSaveSnapshot(draftItems: DraftOrderItem[]) {
+  try {
+    const payload = buildRepairOrderItemsPayload(draftItems, true);
+
+    return {
+      payload,
+      signature: JSON.stringify(payload)
+    };
+  } catch {
+    return null;
+  }
+}
 
 export function OrderDetailPage({
   accessToken,
@@ -55,12 +69,30 @@ export function OrderDetailPage({
   const [draftItems, setDraftItems] = useState<DraftOrderItem[]>([]);
   const [isAuditLoading, setIsAuditLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [itemsSaveState, setItemsSaveState] = useState<AutosaveState>("saved");
   const [isMarkingPaid, setIsMarkingPaid] = useState(false);
   const [showPaymentConfirm, setShowPaymentConfirm] = useState(false);
   const [paymentToVoid, setPaymentToVoid] = useState<OrderPayment | null>(null);
   const [paymentVoidReason, setPaymentVoidReason] = useState("");
   const [voidingPaymentId, setVoidingPaymentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const lastSavedItemsSignatureRef = useRef("");
+  const latestDraftItemsSignatureRef = useRef("");
+  const saveRequestIdRef = useRef(0);
+
+  const replaceOrderDraftState = useCallback((nextOrder: RepairOrderResponse) => {
+    const nextDraftItems = draftItemsFromOrder(nextOrder);
+    const nextSnapshot = draftItemsSaveSnapshot(nextDraftItems);
+
+    if (nextSnapshot) {
+      lastSavedItemsSignatureRef.current = nextSnapshot.signature;
+      latestDraftItemsSignatureRef.current = nextSnapshot.signature;
+    }
+
+    setOrder(nextOrder);
+    setDraftItems(nextDraftItems);
+    setItemsSaveState("saved");
+  }, []);
 
   const loadAudit = useCallback(async () => {
     if (!canManageOrders || !orderId) {
@@ -94,8 +126,7 @@ export function OrderDetailPage({
     if (!canManageOrders) {
       orderRequest
         .then((orderResponse) => {
-          setOrder(orderResponse);
-          setDraftItems(draftItemsFromOrder(orderResponse));
+          replaceOrderDraftState(orderResponse);
           setMasters([]);
           setPaymentMethods([]);
           setCatalogItems([]);
@@ -111,14 +142,13 @@ export function OrderDetailPage({
       request<ServiceCatalogListResponse>("/api/v1/service-catalog", { headers })
     ])
       .then(([orderResponse, mastersResponse, paymentMethodsResponse, catalogResponse]) => {
-        setOrder(orderResponse);
-        setDraftItems(draftItemsFromOrder(orderResponse));
+        replaceOrderDraftState(orderResponse);
         setMasters(mastersResponse.items);
         setPaymentMethods(paymentMethodsResponse.items);
         setCatalogItems(catalogResponse.items.filter((item) => item.isActive && fixedServiceTypes.has(item.type)));
       })
       .catch(() => setError("Не удалось загрузить заказ."));
-  }, [accessToken, canManageOrders, orderId]);
+  }, [accessToken, canManageOrders, orderId, replaceOrderDraftState]);
 
   useEffect(() => {
     void loadAudit();
@@ -127,18 +157,89 @@ export function OrderDetailPage({
   const isIssued = order?.repairStatus === "ISSUED";
   const isReadOnly = Boolean(isIssued || !canManageOrders);
   const isStatusReadOnly = Boolean(isIssued || !canChangeRepairStatus);
+  const orderIdForSave = order?.id;
   const draftTotals = useMemo(() => calculateDraftTotals(draftItems), [draftItems]);
   const foundCatalogItems = useMemo(() => filterCatalogItems(catalogItems, serviceQuery), [catalogItems, serviceQuery]);
 
+  useEffect(() => {
+    if (!orderIdForSave || isReadOnly) {
+      return undefined;
+    }
+
+    const snapshot = draftItemsSaveSnapshot(draftItems);
+
+    latestDraftItemsSignatureRef.current = snapshot?.signature ?? "";
+
+    if (!snapshot) {
+      setItemsSaveState("idle");
+      return undefined;
+    }
+
+    if (snapshot.signature === lastSavedItemsSignatureRef.current) {
+      setItemsSaveState("saved");
+
+      return undefined;
+    }
+
+    setItemsSaveState("idle");
+
+    const timeoutId = window.setTimeout(async () => {
+      const requestId = saveRequestIdRef.current + 1;
+      saveRequestIdRef.current = requestId;
+      setError(null);
+      setIsSaving(true);
+      setItemsSaveState("saving");
+
+      try {
+        const updated = await request<RepairOrderResponse>(`/api/v1/repair-orders/${orderIdForSave}/items`, {
+          method: "PUT",
+          headers: authHeaders(accessToken),
+          body: JSON.stringify({
+            items: snapshot.payload
+          })
+        });
+
+        if (
+          saveRequestIdRef.current !== requestId ||
+          latestDraftItemsSignatureRef.current !== snapshot.signature
+        ) {
+          return;
+        }
+
+        replaceOrderDraftState(updated);
+        void loadAudit();
+      } catch {
+        if (latestDraftItemsSignatureRef.current === snapshot.signature) {
+          setError("Не удалось сохранить заказ. После выдачи заказ закрыт для изменений.");
+          setItemsSaveState("idle");
+        }
+      } finally {
+        if (saveRequestIdRef.current === requestId) {
+          setIsSaving(false);
+        }
+      }
+    }, 700);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [accessToken, draftItems, isReadOnly, loadAudit, orderIdForSave, replaceOrderDraftState]);
+
   function updateDraftItem(localId: string, patch: Partial<DraftOrderItem>) {
+    setError(null);
     setDraftItems((current) => current.map((item) => (item.localId === localId ? { ...item, ...patch } : item)));
   }
 
   function removeDraftItem(localId: string) {
+    if (draftItems.length <= 1) {
+      setError("В заказе должна быть хотя бы одна позиция.");
+      return;
+    }
+
+    setError(null);
     setDraftItems((current) => current.filter((item) => item.localId !== localId));
   }
 
   function addCatalogItem(item: ServiceCatalogItemResponse) {
+    setError(null);
     setDraftItems((current) => [
       ...current,
       createDraftItem({
@@ -154,6 +255,7 @@ export function OrderDetailPage({
   }
 
   function addQuickItem(item: Partial<DraftOrderItem>) {
+    setError(null);
     setDraftItems((current) => [
       ...current,
       createDraftItem({
@@ -161,36 +263,6 @@ export function OrderDetailPage({
         assignedMasterMembershipId: item.type === "SERVICE" ? (order?.assignedMasterMembershipId ?? null) : null
       })
     ]);
-  }
-
-  async function saveItems() {
-    if (!order) {
-      return;
-    }
-
-    setError(null);
-    setIsSaving(true);
-
-    try {
-      if (draftItems.length === 0) {
-        throw new Error("Empty items");
-      }
-
-      const updated = await request<RepairOrderResponse>(`/api/v1/repair-orders/${order.id}/items`, {
-        method: "PUT",
-        headers: authHeaders(accessToken),
-        body: JSON.stringify({
-          items: buildRepairOrderItemsPayload(draftItems, true)
-        })
-      });
-
-      setOrder(updated);
-      setDraftItems(draftItemsFromOrder(updated));
-    } catch {
-      setError("Не удалось сохранить заказ. После выдачи заказ закрыт для изменений.");
-    } finally {
-      setIsSaving(false);
-    }
   }
 
   async function changeMaster(nextMasterId: string) {
@@ -285,7 +357,7 @@ export function OrderDetailPage({
     }
   }
 
-  function updateCustomerInOrder(customer: CustomerResponse) {
+  const updateCustomerInOrder = useCallback((customer: CustomerResponse) => {
     setOrder((current) =>
       current
         ? {
@@ -297,7 +369,7 @@ export function OrderDetailPage({
           }
         : current
     );
-  }
+  }, []);
 
   if (!order) {
     return (
@@ -347,12 +419,12 @@ export function OrderDetailPage({
           foundCatalogItems={foundCatalogItems}
           isReadOnly={isReadOnly}
           isSaving={isSaving}
+          itemsSaveState={itemsSaveState}
           masters={masters}
           navigate={navigate}
           onAddCatalogItem={addCatalogItem}
           onAddQuickItem={addQuickItem}
           onRemoveItem={removeDraftItem}
-          onSaveItems={() => void saveItems()}
           onServiceQueryChange={setServiceQuery}
           onUpdateItem={updateDraftItem}
           order={order}

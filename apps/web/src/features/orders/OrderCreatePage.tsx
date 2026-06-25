@@ -299,7 +299,7 @@ export function OrderCreatePage({
                           <Trash2 size={16} />
                         </GhostButton>
                       </div>
-                      <div className="grid gap-3 rounded-lg bg-white/[0.05] p-3 ring-1 ring-white/[0.08] sm:grid-cols-3">
+                    <div className="grid gap-3 rounded-lg border border-white/[0.08] bg-white/[0.045] p-3 shadow-inner-glass md:grid-cols-2 xl:grid-cols-3">
                         <TextField
                           inputMode="decimal"
                           label={draftItemPriceLabel(item)}
@@ -359,7 +359,7 @@ export function OrderCreatePage({
                         value={item.name}
                       />
                     </div>
-                    <div className={`grid gap-3 ${isService ? "" : "sm:grid-cols-2"}`}>
+                    <div className={`grid gap-3 ${isService ? "" : "md:grid-cols-2"}`}>
                       <TextField
                         inputMode="decimal"
                         label={draftItemPriceLabel(item)}
