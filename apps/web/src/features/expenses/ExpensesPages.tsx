@@ -153,7 +153,7 @@ function expenseKindLabel(kind: ExpenseResponse["kind"]) {
   }
 
   if (kind === "SALARY") {
-    return "Зарплата";
+    return "Комиссия мастеру";
   }
 
   return "Расход";
@@ -414,7 +414,7 @@ export function ExpensesListPage({
         <MetricCard label="Черновики" tone="text-amber" value={money(totals.draft)} />
         <MetricCard hint="Ручные расходы." label="Обычные" value={money(totals.regular)} />
         <MetricCard hint="Создаются при выдаче заказа." label="Налоги" tone="text-coral" value={money(totals.tax)} />
-        <MetricCard hint="Создаются при выплате мастеру." label="Зарплаты" tone="text-orchid" value={money(totals.salary)} />
+        <MetricCard hint="Создаются при выплате мастеру." label="Комиссии" tone="text-orchid" value={money(totals.salary)} />
       </div>
 
       <div className="mt-4 grid gap-3">

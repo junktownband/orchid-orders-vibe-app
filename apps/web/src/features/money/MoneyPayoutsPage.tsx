@@ -671,7 +671,7 @@ export function MoneyPayoutsPage({
         >
           <div className="grid gap-3">
             <p>
-              Расход <strong className="text-white">Зарплата</strong>:{" "}
+              Расход <strong className="text-white">Комиссия мастеру</strong>:{" "}
               <strong className="text-white">{money(commissionToPay.commissionAmountCents)}</strong>.
             </p>
             <div className="rounded-lg bg-white/[0.055] p-3 ring-1 ring-white/[0.08]">
@@ -700,7 +700,7 @@ export function MoneyPayoutsPage({
         >
           <div className="grid gap-3">
             <p>
-              Расходы <strong className="text-white">Зарплата</strong>:{" "}
+              Расходы <strong className="text-white">Комиссии мастерам</strong>:{" "}
               <strong className="text-white">{bulkPayoutTarget.items.length}</strong>.
             </p>
             <div className="rounded-lg bg-white/[0.055] p-3 ring-1 ring-white/[0.08]">

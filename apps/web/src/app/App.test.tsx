@@ -367,7 +367,7 @@ describe("App", () => {
     render(<App />);
 
     await screen.findByLabelText("Заказы");
-    await screen.findByText("Актуально");
+    await screen.findByRole("heading", { name: "Состояние заказов" });
     fireEvent.click(screen.getByLabelText("Деньги"));
 
     expect(await screen.findByText("Финансовая позиция")).toBeInTheDocument();
@@ -639,7 +639,7 @@ describe("App", () => {
     render(<App />);
 
     await screen.findByLabelText("Заказы");
-    await screen.findByText("Актуально");
+    await screen.findByRole("heading", { name: "Состояние заказов" });
     fireEvent.click(screen.getByLabelText("Деньги"));
     expect(await screen.findByText("Финансовая позиция")).toBeInTheDocument();
 

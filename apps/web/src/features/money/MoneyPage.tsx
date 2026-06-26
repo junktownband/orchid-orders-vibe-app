@@ -588,9 +588,9 @@ export function MoneyPage({
 
         <GlassPanel as="article" className="p-4">
           <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center xl:grid-cols-1 xl:items-start">
-            <StatHeader icon={ReceiptText} label="Контроль" title="Расходы" />
+            <StatHeader icon={ReceiptText} label="Расходы" title="Расходы бизнеса" />
             <div className="flex items-center justify-between gap-3 xl:w-full">
-              <PlainMetric label="За месяц" tone="text-[rgb(var(--status-rose-text))]" value={overview ? money(overview.summary.confirmedExpensesCents) : "..."} />
+              <PlainMetric label="Операционные" tone="text-[rgb(var(--status-rose-text))]" value={overview ? money(overview.summary.confirmedExpensesCents) : "..."} />
               <GhostButton onClick={() => navigate({ section: "money", view: "expenses", month })}>
                 <ReceiptText aria-hidden="true" size={17} />
                 Расходы
@@ -602,8 +602,11 @@ export function MoneyPage({
         <GlassPanel as="article" className="p-4">
           <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center xl:grid-cols-1 xl:items-start">
             <StatHeader icon={Users} label="Обязательства" title="Выплаты мастерам" />
-            <div className="flex items-center justify-between gap-3 xl:w-full">
-              <PlainMetric label="К выплате" tone="text-amber" value={overview ? money(overview.summary.payableCommissionsCents) : "..."} />
+            <div className="grid gap-3 xl:w-full">
+              <div className="grid grid-cols-2 gap-3">
+                <PlainMetric label="К выплате" tone="text-amber" value={overview ? money(overview.summary.payableCommissionsCents) : "..."} />
+                <PlainMetric label="Выплачено" tone="text-[rgb(var(--status-rose-text))]" value={overview ? money(overview.summary.paidCommissionsCents) : "..."} />
+              </div>
               <GhostButton onClick={() => navigate({ section: "money", view: "payouts", month })}>
                 <Users aria-hidden="true" size={17} />
                 Выплаты мастерам
