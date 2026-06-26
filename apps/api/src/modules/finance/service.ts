@@ -118,6 +118,7 @@ export async function getFinanceOverview(
         data.paidRevenueCents +
         data.manualInflowCents -
         data.confirmedExpensesCents -
+        data.paidCommissionsCents -
         data.manualOutflowCents,
       repairOrdersCount: data.repairOrdersCount,
       paidOrdersCount: data.paidOrdersCount,

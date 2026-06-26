@@ -159,7 +159,7 @@ export const financeOverviewResponse = {
     payableCommissionsCents: 200_000,
     manualInflowCents: 50_000,
     manualOutflowCents: 20_000,
-    netMovementCents: 810_000,
+    netMovementCents: 730_000,
     repairOrdersCount: 7,
     paidOrdersCount: 5,
     unpaidOrdersCount: 2,

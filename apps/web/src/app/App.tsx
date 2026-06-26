@@ -1,6 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "framer-motion";
-import { LogOut } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AuthResponse, AuthUser } from "@orchid/shared";
@@ -251,14 +250,6 @@ function AppShell({
                 </p>
                 <p className="mt-1 text-xs text-white/42">{roleLabel(user.role)}</p>
               </div>
-              <button
-                className="grid h-11 w-11 touch-manipulation place-items-center rounded-md border border-white/10 bg-white/[0.055] text-white shadow-inner-glass transition-[background-color,border-color,box-shadow,transform] hover:border-white/18 hover:bg-white/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30 active:translate-y-px"
-                aria-label="Выйти из системы"
-                onClick={() => void handleLogout()}
-                type="button"
-              >
-                <LogOut aria-hidden="true" size={20} />
-              </button>
             </div>
           </header>
 

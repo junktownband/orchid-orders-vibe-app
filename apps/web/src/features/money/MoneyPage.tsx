@@ -613,7 +613,19 @@ export function MoneyPage({
               <PlainMetric label="Остаток счета" tone="text-mint" value={overview ? money(overview.account.balanceCents) : "..."} />
               <PlainMetric label="После выплат" value={overview ? money(overview.account.availableAfterObligationsCents) : "..."} />
               <PlainMetric label="Поступления" tone="text-[rgb(var(--status-sage-text))]" value={overview ? money(overview.summary.paidRevenueCents + overview.summary.manualInflowCents) : "..."} />
-              <PlainMetric label="Исходящие" tone="text-[rgb(var(--status-rose-text))]" value={overview ? money(overview.summary.confirmedExpensesCents + overview.summary.manualOutflowCents) : "..."} />
+              <PlainMetric
+                label="Исходящие"
+                tone="text-[rgb(var(--status-rose-text))]"
+                value={
+                  overview
+                    ? money(
+                        overview.summary.confirmedExpensesCents +
+                          overview.summary.paidCommissionsCents +
+                          overview.summary.manualOutflowCents
+                      )
+                    : "..."
+                }
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4 border-t border-white/[0.08] pt-4 sm:grid-cols-3 xl:grid-cols-1 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">

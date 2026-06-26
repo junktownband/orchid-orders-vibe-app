@@ -216,7 +216,7 @@ describe("finance service", () => {
         payableCommissionsCents: 40_000,
         manualInflowCents: 20_000,
         manualOutflowCents: 10_000,
-        netMovementCents: 260_000,
+        netMovementCents: 230_000,
         repairOrdersCount: 4,
         unpaidOrdersCount: 2,
         partiallyPaidOrdersCount: 1,

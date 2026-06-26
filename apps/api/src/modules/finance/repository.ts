@@ -180,6 +180,7 @@ function buildOperationalAnalytics({
     amountCents: number;
     category: { name: string | null } | null;
     createdBy: { id: string; name: string | null; email: string } | null;
+    kind: ExpenseKind;
     paymentMethod: { id: string; name: string } | null;
   }>;
   paymentDetails: Array<{
@@ -285,31 +286,33 @@ function buildOperationalAnalytics({
       method.count += 1;
     }
 
-    const categoryLabel = expense.category?.name ?? "Без категории";
-    const categoryKey = categoryLabel.toLowerCase();
-    const category = expensesByCategory.get(categoryKey) ?? {
-      key: categoryKey,
-      label: categoryLabel,
-      amountCents: 0,
-      count: 0
-    };
+    if (expense.kind !== ExpenseKind.SALARY) {
+      const categoryLabel = expense.category?.name ?? "Без категории";
+      const categoryKey = categoryLabel.toLowerCase();
+      const category = expensesByCategory.get(categoryKey) ?? {
+        key: categoryKey,
+        label: categoryLabel,
+        amountCents: 0,
+        count: 0
+      };
 
-    category.amountCents += expense.amountCents;
-    category.count += 1;
-    expensesByCategory.set(categoryKey, category);
+      category.amountCents += expense.amountCents;
+      category.count += 1;
+      expensesByCategory.set(categoryKey, category);
 
-    const creatorKey = expense.createdBy?.id ?? "unknown";
-    const creatorLabel = expense.createdBy?.name ?? expense.createdBy?.email ?? "Без автора";
-    const creator = expensesByCreator.get(creatorKey) ?? {
-      key: creatorKey,
-      label: creatorLabel,
-      amountCents: 0,
-      count: 0
-    };
+      const creatorKey = expense.createdBy?.id ?? "unknown";
+      const creatorLabel = expense.createdBy?.name ?? expense.createdBy?.email ?? "Без автора";
+      const creator = expensesByCreator.get(creatorKey) ?? {
+        key: creatorKey,
+        label: creatorLabel,
+        amountCents: 0,
+        count: 0
+      };
 
-    creator.amountCents += expense.amountCents;
-    creator.count += 1;
-    expensesByCreator.set(creatorKey, creator);
+      creator.amountCents += expense.amountCents;
+      creator.count += 1;
+      expensesByCreator.set(creatorKey, creator);
+    }
   }
 
   for (const operation of manualOperationDetails) {
@@ -462,6 +465,9 @@ export async function getFinanceData(organizationId: string, period: Period) {
     prisma.expense.aggregate({
       where: {
         organizationId,
+        kind: {
+          not: ExpenseKind.SALARY
+        },
         status: ExpenseStatus.CONFIRMED,
         spentAt: {
           gte: period.from,
@@ -641,6 +647,7 @@ export async function getFinanceData(organizationId: string, period: Period) {
             email: true
           }
         },
+        kind: true,
         paymentMethod: {
           select: {
             id: true,

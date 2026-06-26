@@ -325,6 +325,7 @@ describe("App", () => {
     render(<App />);
 
     await screen.findByLabelText("Заказы");
+    expect(screen.queryByLabelText("Выйти из системы")).not.toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("Настройки"));
     fireEvent.click(await screen.findByRole("button", { name: "Выйти" }));
 
