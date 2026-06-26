@@ -2,8 +2,11 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 import { fileURLToPath, URL } from "node:url";
 
+const faviconsDir = fileURLToPath(new URL("../../favicons", import.meta.url));
+
 export default defineConfig({
   plugins: [react()],
+  publicDir: faviconsDir,
   resolve: {
     alias: {
       "@orchid/shared": fileURLToPath(new URL("../../packages/shared/src/index.ts", import.meta.url))
