@@ -28,7 +28,14 @@ const audit = vi.hoisted(() => ({
 vi.mock("./repository.js", () => repository);
 vi.mock("../audit/service.js", () => audit);
 
-const { addExpenseCategory, addPaymentMethod, editExpenseCategory, editPaymentMethod } = await import("./service.js");
+const {
+  addExpenseCategory,
+  addPaymentMethod,
+  assertActivePaymentMethod,
+  editExpenseCategory,
+  editPaymentMethod,
+  getPaymentMethods
+} = await import("./service.js");
 
 const adminAuth: AuthContext = {
   userId: "user-1",
@@ -53,7 +60,7 @@ function paymentMethodRecord(overrides: Record<string, unknown> = {}) {
   return {
     id: "payment-method-1",
     organizationId: "org-1",
-    name: "Cash",
+    name: "Наличные",
     isActive: true,
     sortOrder: 10,
     createdAt: new Date("2026-06-01T10:00:00.000Z"),
@@ -86,12 +93,12 @@ describe("reference settings audit", () => {
 
     await expect(
       addPaymentMethod(adminAuth, {
-        name: " Cash ",
+        name: "Наличные",
         sortOrder: 10
       })
     ).resolves.toMatchObject({
       id: "payment-method-1",
-      name: "Cash"
+      name: "Наличные"
     });
 
     expect(audit.writeAuditLog).toHaveBeenCalledWith(adminAuth, {
@@ -99,7 +106,7 @@ describe("reference settings audit", () => {
       entityId: "payment-method-1",
       action: "CREATE",
       afterJson: expect.objectContaining({
-        name: "Cash",
+        name: "Наличные",
         isActive: true,
         sortOrder: 10
       }),
@@ -150,7 +157,7 @@ describe("reference settings audit", () => {
 
     await expect(
       editPaymentMethod(adminAuth, "payment-method-1", {
-        name: "Cash",
+        name: "Наличные",
         isActive: false,
         sortOrder: 10
       })
@@ -164,11 +171,57 @@ describe("reference settings audit", () => {
       entityId: "payment-method-1",
       action: "DELETE",
       afterJson: expect.objectContaining({
-        name: "Cash",
+        name: "Наличные",
         isActive: false,
         sortOrder: 10
       }),
       comment: "Payment method deactivated"
+    });
+  });
+
+  it("lists only cash and transfer payment methods", async () => {
+    repository.listPaymentMethods.mockResolvedValue([
+      paymentMethodRecord({
+        id: "payment-method-cash",
+        name: "Наличные",
+        sortOrder: 10
+      }),
+      paymentMethodRecord({
+        id: "payment-method-terminal",
+        name: "Терминал",
+        sortOrder: 20
+      }),
+      paymentMethodRecord({
+        id: "payment-method-transfer",
+        name: "Перевод",
+        sortOrder: 30
+      })
+    ]);
+
+    await expect(getPaymentMethods(adminAuth)).resolves.toMatchObject({
+      items: [
+        {
+          id: "payment-method-cash",
+          name: "Наличные"
+        },
+        {
+          id: "payment-method-transfer",
+          name: "Перевод"
+        }
+      ]
+    });
+  });
+
+  it("rejects unsupported active payment methods for money operations", async () => {
+    repository.findActivePaymentMethod.mockResolvedValue(
+      paymentMethodRecord({
+        id: "payment-method-terminal",
+        name: "Терминал"
+      })
+    );
+
+    await expect(assertActivePaymentMethod("org-1", "payment-method-terminal")).rejects.toMatchObject({
+      statusCode: 404
     });
   });
 

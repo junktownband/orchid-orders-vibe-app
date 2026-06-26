@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import { BarChart3, ClipboardList, Landmark, Search, Settings, WalletCards } from "lucide-react";
+import { Banknote, BarChart3, ClipboardList, Settings } from "lucide-react";
 
 import {
   type AuditLogResponse,
@@ -19,13 +19,18 @@ export const request = apiRequest;
 export const queryClient = new QueryClient();
 export const authSessionStorageKey = "orchid_auth_session_v1";
 
-export type MainSection = "dashboard" | "orders" | "expenses" | "analytics" | "money" | "settings";
+export type MainSection = "dashboard" | "orders" | "money" | "settings";
 export type Screen =
   | { section: "dashboard" }
   | { section: "orders"; view: "list" | "create" | "detail" | "issue"; orderId?: string }
   | { section: "expenses"; view: "list" | "create"; orderId?: string; itemId?: string }
-  | { section: "analytics" }
-  | { section: "money" }
+  | {
+      section: "money";
+      view?: "overview" | "expenses" | "expense-create" | "payouts" | "ledger" | "receivables" | "audit";
+      month?: string;
+      orderId?: string;
+      itemId?: string;
+    }
   | {
       section: "settings";
       view:
@@ -82,9 +87,7 @@ export type DraftOrderItem = {
 export const navItems: Array<{ section: MainSection; label: string; icon: Icon }> = [
   { section: "dashboard", label: "Главная", icon: BarChart3 },
   { section: "orders", label: "Заказы", icon: ClipboardList },
-  { section: "expenses", label: "Расходы", icon: WalletCards },
-  { section: "money", label: "Деньги", icon: Landmark },
-  { section: "analytics", label: "Выплаты", icon: Search },
+  { section: "money", label: "Деньги", icon: Banknote },
   { section: "settings", label: "Настройки", icon: Settings }
 ];
 
@@ -133,17 +136,18 @@ export function navItemsForUser(user: Pick<AuthUser, "role">) {
     return navItems.filter((item) => item.section === "orders");
   }
 
-  if (canManageMoney(user)) {
-    return navItems;
-  }
-
-  return navItems.filter((item) => item.section !== "money");
+  return navItems;
 }
 
 export function screenForUser(user: Pick<AuthUser, "role">, screen: Screen): Screen {
   if (canAccessBackOffice(user)) {
     if (screen.section === "money" && !canManageMoney(user)) {
-      return { section: "dashboard" };
+      return screen.view === "expenses" || screen.view === "expense-create"
+        ? screen
+        : {
+            section: "money",
+            view: "expenses"
+          };
     }
 
     if (
@@ -241,12 +245,12 @@ export function defaultScreen(section: MainSection): Screen {
     return { section, view: "list" };
   }
 
-  if (section === "expenses") {
-    return { section, view: "list" };
-  }
-
   if (section === "settings") {
     return { section, view: "profile" };
+  }
+
+  if (section === "money") {
+    return { section, view: "overview" };
   }
 
   return { section };
@@ -274,6 +278,10 @@ export function screenTitle(screen: Screen) {
   }
 
   if (screen.section === "money") {
+    if (screen.view === "expense-create") {
+      return "Новый расход";
+    }
+
     return "Деньги";
   }
 
@@ -314,6 +322,8 @@ export function screenTitle(screen: Screen) {
 
 export function screenFromLocation(location: Location): Screen {
   const parts = location.pathname.split("/").filter(Boolean);
+  const params = new URLSearchParams(location.search);
+  const month = params.get("month") ?? undefined;
 
   if (parts[0] === "orders") {
     if (parts[1] === "new") {
@@ -333,8 +343,6 @@ export function screenFromLocation(location: Location): Screen {
 
   if (parts[0] === "expenses") {
     if (parts[1] === "new") {
-      const params = new URLSearchParams(location.search);
-
       return {
         section: "expenses",
         view: "create",
@@ -343,15 +351,45 @@ export function screenFromLocation(location: Location): Screen {
       };
     }
 
-    return { section: "expenses", view: "list" };
+    return { section: "money", view: "expenses" };
   }
 
   if (parts[0] === "analytics") {
-    return { section: "analytics" };
+    return { section: "money", view: "payouts" };
   }
 
   if (parts[0] === "money") {
-    return { section: "money" };
+    if (parts[1] === "expenses") {
+      if (parts[2] === "new") {
+        return {
+          section: "money",
+          view: "expense-create",
+          month,
+          orderId: params.get("orderId") ?? undefined,
+          itemId: params.get("itemId") ?? undefined
+        };
+      }
+
+      return { section: "money", view: "expenses", month };
+    }
+
+    if (parts[1] === "payouts") {
+      return { section: "money", view: "payouts", month };
+    }
+
+    if (parts[1] === "ledger") {
+      return { section: "money", view: "ledger", month };
+    }
+
+    if (parts[1] === "receivables") {
+      return { section: "money", view: "receivables", month };
+    }
+
+    if (parts[1] === "audit") {
+      return { section: "money", view: "audit" };
+    }
+
+    return { section: "money", view: "overview", month };
   }
 
   if (parts[0] === "settings") {
@@ -408,7 +446,7 @@ export function pathForScreen(screen: Screen) {
 
   if (screen.section === "expenses") {
     if (screen.view !== "create") {
-      return "/expenses";
+      return "/money/expenses";
     }
 
     const params = new URLSearchParams();
@@ -426,12 +464,52 @@ export function pathForScreen(screen: Screen) {
     return search ? `/expenses/new?${search}` : "/expenses/new";
   }
 
-  if (screen.section === "analytics") {
-    return "/analytics";
-  }
-
   if (screen.section === "money") {
-    return "/money";
+    const params = new URLSearchParams();
+
+    if (screen.month) {
+      params.set("month", screen.month);
+    }
+
+    if (screen.view === "expenses") {
+      const search = params.toString();
+
+      return `/money/expenses${search ? `?${search}` : ""}`;
+    }
+
+    if (screen.view === "expense-create") {
+      if (screen.orderId) {
+        params.set("orderId", screen.orderId);
+      }
+
+      if (screen.itemId) {
+        params.set("itemId", screen.itemId);
+      }
+
+      const search = params.toString();
+
+      return `/money/expenses/new${search ? `?${search}` : ""}`;
+    }
+
+    const search = params.toString() ? `?${params.toString()}` : "";
+
+    if (screen.view === "payouts") {
+      return `/money/payouts${search}`;
+    }
+
+    if (screen.view === "ledger") {
+      return `/money/ledger${search}`;
+    }
+
+    if (screen.view === "receivables") {
+      return `/money/receivables${search}`;
+    }
+
+    if (screen.view === "audit") {
+      return "/money/audit";
+    }
+
+    return `/money${search}`;
   }
 
   if (screen.section === "settings") {
@@ -930,6 +1008,18 @@ export function auditEntityLabel(entityType: string) {
 
   if (entityType === "Expense") {
     return "Расход";
+  }
+
+  if (entityType === "FinanceOperation") {
+    return "Ручная операция";
+  }
+
+  if (entityType === "PaymentMethod") {
+    return "Способ оплаты";
+  }
+
+  if (entityType === "ExpenseCategory") {
+    return "Статья расходов";
   }
 
   if (entityType === "ServiceCatalogItem") {

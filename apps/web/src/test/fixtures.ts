@@ -136,7 +136,159 @@ export const serviceCatalogResponse = {
 };
 
 export const expensesResponse = {
-  items: []
+  items: [],
+  authors: []
+};
+
+export const financeOverviewResponse = {
+  period: {
+    from: "2026-06-01T00:00:00.000Z",
+    to: "2026-06-30T23:59:59.999Z"
+  },
+  account: {
+    balanceCents: 1_250_000,
+    availableAfterObligationsCents: 1_050_000,
+    cashGapRiskCents: 0
+  },
+  summary: {
+    paidRevenueCents: 900_000,
+    paidCostCents: 240_000,
+    grossProfitCents: 660_000,
+    confirmedExpensesCents: 120_000,
+    paidCommissionsCents: 80_000,
+    payableCommissionsCents: 200_000,
+    manualInflowCents: 50_000,
+    manualOutflowCents: 20_000,
+    netMovementCents: 810_000,
+    repairOrdersCount: 7,
+    paidOrdersCount: 5,
+    unpaidOrdersCount: 2,
+    partiallyPaidOrdersCount: 1,
+    receivablesCents: 220_000,
+    averagePaidTicketCents: 180_000
+  },
+  analytics: {
+    serviceMix: {
+      standard: {
+        count: 6,
+        revenueCents: 620_000,
+        grossProfitCents: 450_000
+      },
+      custom: {
+        count: 3,
+        revenueCents: 280_000,
+        grossProfitCents: 210_000
+      }
+    },
+    masterWorks: [
+      {
+        masterMembershipId: "member-1",
+        masterName: "Owner",
+        servicesCount: 5,
+        standardServicesCount: 4,
+        customServicesCount: 1,
+        revenueCents: 500_000,
+        grossProfitCents: 360_000,
+        commissionCents: 120_000
+      },
+      {
+        masterMembershipId: "member-2",
+        masterName: "Master 1",
+        servicesCount: 4,
+        standardServicesCount: 2,
+        customServicesCount: 2,
+        revenueCents: 400_000,
+        grossProfitCents: 300_000,
+        commissionCents: 110_000
+      }
+    ],
+    paymentMethods: [
+      {
+        key: "payment-method-1",
+        label: "Наличные",
+        inflowCents: 520_000,
+        outflowCents: 80_000,
+        netCents: 440_000,
+        count: 6
+      },
+      {
+        key: "payment-method-2",
+        label: "Перевод",
+        inflowCents: 380_000,
+        outflowCents: 40_000,
+        netCents: 340_000,
+        count: 3
+      }
+    ],
+    expensesByCategory: [
+      {
+        key: "materials",
+        label: "Материалы",
+        amountCents: 80_000,
+        count: 3
+      },
+      {
+        key: "rent",
+        label: "Аренда",
+        amountCents: 40_000,
+        count: 1
+      }
+    ],
+    expensesByCreator: [
+      {
+        key: "user-1",
+        label: "Саша",
+        amountCents: 120_000,
+        count: 4
+      }
+    ]
+  },
+  masterCommissions: [
+    {
+      masterMembershipId: "member-2",
+      masterName: "Master 1",
+      accruedCents: 200_000,
+      paidCents: 80_000,
+      payableCents: 120_000,
+      accruedItemsCount: 4,
+      paidItemsCount: 1,
+      payableItemsCount: 3
+    }
+  ],
+  receivableOrders: [
+    {
+      id: "repair-2",
+      orderNumber: "00002",
+      customerName: "Анна",
+      instrumentName: "Fender Telecaster",
+      repairStatus: "IN_PROGRESS",
+      paymentStatus: "PARTIALLY_PAID",
+      totalAmountCents: 300_000,
+      paidAmountCents: 80_000,
+      balanceDueCents: 220_000,
+      createdAt: "2026-06-12T10:00:00.000Z",
+      updatedAt: "2026-06-18T12:00:00.000Z"
+    }
+  ],
+  operations: [
+    {
+      id: "payment-1",
+      source: "PAYMENT",
+      type: "PAYMENT_RECEIVED",
+      direction: "IN",
+      amountCents: 300_000,
+      signedAmountCents: 300_000,
+      occurredAt: "2026-06-10T10:00:00.000Z",
+      description: "Оплата заказа № 00001",
+      paymentMethodId: "payment-method-1",
+      paymentMethodName: "Наличные",
+      counterpartyName: "Петр",
+      repairOrderId: "repair-1",
+      repairOrderNumber: "00001",
+      createdByName: "Саша",
+      comment: null
+    }
+  ]
 };
 
 export const paymentMethodsResponse = {
@@ -146,6 +298,14 @@ export const paymentMethodsResponse = {
       name: "Наличные",
       isActive: true,
       sortOrder: 10,
+      createdAt: "2026-05-29T08:00:00.000Z",
+      updatedAt: "2026-05-29T08:00:00.000Z"
+    },
+    {
+      id: "payment-method-2",
+      name: "Перевод",
+      isActive: true,
+      sortOrder: 20,
       createdAt: "2026-05-29T08:00:00.000Z",
       updatedAt: "2026-05-29T08:00:00.000Z"
     }

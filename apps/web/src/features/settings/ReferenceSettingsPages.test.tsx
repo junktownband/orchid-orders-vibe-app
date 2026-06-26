@@ -23,8 +23,9 @@ describe("ReferenceSettingsPage", () => {
 
     render(<ReferenceSettingsPage accessToken="access-token" kind="payment-methods" navigate={vi.fn()} />);
 
-    fireEvent.click(await screen.findByLabelText("Активен"));
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить" }));
+    const activeToggles = await screen.findAllByLabelText("Активен");
+    fireEvent.click(activeToggles[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Сохранить" })[0]);
 
     expect(screen.getByRole("heading", { name: "Отключить способ оплаты?" })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);

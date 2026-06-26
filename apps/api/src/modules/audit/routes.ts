@@ -7,6 +7,7 @@ import { authenticate, AuthError } from "../auth/service.js";
 import { getAuditLogs } from "./service.js";
 
 const auditQuerySchema = z.object({
+  scope: z.enum(["finance"]).optional(),
   entityType: z.string().min(1).optional(),
   entityId: z.string().min(1).optional(),
   action: auditActionSchema.optional(),

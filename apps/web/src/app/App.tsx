@@ -69,14 +69,24 @@ const ExpenseCreatePage = lazy(() =>
     default: ExpenseCreatePage
   }))
 );
-const AnalyticsPage = lazy(() =>
-  import("../features/analytics/AnalyticsPage").then(({ AnalyticsPage }) => ({
-    default: AnalyticsPage
+const MoneyPayoutsPage = lazy(() =>
+  import("../features/money/MoneyPayoutsPage").then(({ MoneyPayoutsPage }) => ({
+    default: MoneyPayoutsPage
   }))
 );
 const MoneyPage = lazy(() =>
   import("../features/money/MoneyPage").then(({ MoneyPage }) => ({
     default: MoneyPage
+  }))
+);
+const MoneyLedgerPage = lazy(() =>
+  import("../features/money/MoneyLedgerPage").then(({ MoneyLedgerPage }) => ({
+    default: MoneyLedgerPage
+  }))
+);
+const MoneyReceivablesPage = lazy(() =>
+  import("../features/money/MoneyReceivablesPage").then(({ MoneyReceivablesPage }) => ({
+    default: MoneyReceivablesPage
   }))
 );
 const SettingsProfilePage = lazy(() =>
@@ -292,7 +302,9 @@ function AppShell({
                   orderId={screen.orderId}
                 />
               ) : null}
-              {canUseBackOffice && screen.section === "expenses" && screen.view === "list" ? (
+              {canUseBackOffice &&
+              ((screen.section === "expenses" && screen.view === "list") ||
+                (screen.section === "money" && screen.view === "expenses")) ? (
                 <ExpensesListPage accessToken={accessToken} navigate={navigate} />
               ) : null}
               {canUseBackOffice && screen.section === "expenses" && screen.view === "create" ? (
@@ -303,11 +315,28 @@ function AppShell({
                   orderId={screen.orderId}
                 />
               ) : null}
-              {canUseBackOffice && screen.section === "analytics" ? (
-                <AnalyticsPage accessToken={accessToken} user={user} />
+              {canUseBackOffice && screen.section === "money" && screen.view === "expense-create" ? (
+                <ExpenseCreatePage
+                  accessToken={accessToken}
+                  itemId={screen.itemId}
+                  navigate={navigate}
+                  orderId={screen.orderId}
+                />
               ) : null}
-              {canUseMoney && screen.section === "money" ? (
+              {canUseMoney && screen.section === "money" && screen.view === "payouts" ? (
+                <MoneyPayoutsPage accessToken={accessToken} navigate={navigate} user={user} />
+              ) : null}
+              {canUseMoney && screen.section === "money" && (screen.view ?? "overview") === "overview" ? (
                 <MoneyPage accessToken={accessToken} navigate={navigate} />
+              ) : null}
+              {canUseMoney && screen.section === "money" && screen.view === "ledger" ? (
+                <MoneyLedgerPage accessToken={accessToken} navigate={navigate} />
+              ) : null}
+              {canUseMoney && screen.section === "money" && screen.view === "receivables" ? (
+                <MoneyReceivablesPage accessToken={accessToken} navigate={navigate} />
+              ) : null}
+              {canUseMoney && screen.section === "money" && screen.view === "audit" ? (
+                <AuditLogPage accessToken={accessToken} mode="money" navigate={navigate} />
               ) : null}
               {canUseBackOffice && screen.section === "settings" && screen.view === "profile" ? (
                 <SettingsProfilePage user={user} navigate={navigate} onLogout={handleLogout} />

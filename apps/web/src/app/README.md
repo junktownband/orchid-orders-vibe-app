@@ -12,7 +12,7 @@ Read this folder only for application shell work: auth session recovery, URL rou
 
 - Orders: `../features/orders`
 - Expenses: `../features/expenses`
-- Analytics: `../features/analytics`
+- Money: `../features/money`
 - Settings: `../features/settings`
 - Auth: `../features/auth`
 

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const auth = vi.hoisted(() => ({
   authenticate: vi.fn().mockResolvedValue({
@@ -43,6 +43,10 @@ vi.mock("./service.js", () => audit);
 const { buildApp } = await import("../../app.js");
 
 describe("audit query", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("accepts an action filter through the audit API", async () => {
     const app = buildApp();
     await app.ready();
@@ -62,6 +66,27 @@ describe("audit query", () => {
       limit: 50,
       entityType: "RepairOrder",
       action: "ISSUE"
+    });
+  });
+
+  it("accepts a finance scope through the audit API", async () => {
+    const app = buildApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/v1/audit?limit=50&scope=finance",
+      headers: {
+        authorization: "Bearer access-token"
+      }
+    });
+
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(audit.getAuditLogs).toHaveBeenCalledWith(expect.any(Object), {
+      limit: 50,
+      scope: "finance"
     });
   });
 });

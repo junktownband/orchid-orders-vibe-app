@@ -1,4 +1,4 @@
-import { RotateCcw } from "lucide-react";
+import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type {
@@ -10,7 +10,16 @@ import type {
   MasterListResponse
 } from "@orchid/shared";
 
-import { authHeaders, dateTime, displayOrderNumber, money, percent, recentDateRange, request } from "../../app/app-core";
+import {
+  authHeaders,
+  dateTime,
+  displayOrderNumber,
+  money,
+  percent,
+  recentDateRange,
+  request,
+  type Navigate
+} from "../../app/app-core";
 import {
   ConfirmDialog,
   GhostButton,
@@ -50,11 +59,47 @@ const payoutStatusOptions: Array<{ value: CommissionPayoutStatus; label: string 
   { value: "PAID", label: "Выплачено" }
 ];
 
-function defaultPayoutFilters(): PayoutFilters {
+function currentMonthValue(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function shiftMonth(value: string, delta: number) {
+  const [year, month] = value.split("-").map(Number);
+  const date = new Date(year, month - 1 + delta, 1);
+
+  return currentMonthValue(date);
+}
+
+function monthLabel(value: string) {
+  const [year, month] = value.split("-").map(Number);
+  const label = new Intl.DateTimeFormat("ru-RU", {
+    month: "long",
+    year: "numeric"
+  }).format(new Date(year, month - 1, 1));
+
+  return label.replace(/^./u, (letter) => letter.toLocaleUpperCase("ru-RU"));
+}
+
+function dateRangeForMonth(value: string) {
+  const [year, month] = value.split("-").map(Number);
+  const from = `${value}-01`;
+  const toDate = new Date(year, month, 0);
+  const to = `${toDate.getFullYear()}-${String(toDate.getMonth() + 1).padStart(2, "0")}-${String(toDate.getDate()).padStart(2, "0")}`;
+
+  return { from, to };
+}
+
+function monthFromSearch(search: string) {
+  const month = new URLSearchParams(search).get("month");
+
+  return month && /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? month : null;
+}
+
+function defaultPayoutFilters(month?: string | null): PayoutFilters {
   return {
     masterMembershipId: "",
     payoutStatus: "UNPAID",
-    ...recentDateRange(60)
+    ...(month ? dateRangeForMonth(month) : recentDateRange(60))
   };
 }
 
@@ -82,8 +127,13 @@ function pathForCommissionFilters(filters: PayoutFilters) {
   return search ? `/api/v1/commissions?${search}` : "/api/v1/commissions";
 }
 
-function searchForPayoutFilters(filters: PayoutFilters) {
+function searchForPayoutFilters(filters: PayoutFilters, month?: string | null) {
   const params = new URLSearchParams();
+  const monthRange = month ? dateRangeForMonth(month) : null;
+
+  if (month) {
+    params.set("month", month);
+  }
 
   if (filters.masterMembershipId) {
     params.set("masterMembershipId", filters.masterMembershipId);
@@ -93,11 +143,11 @@ function searchForPayoutFilters(filters: PayoutFilters) {
     params.set("payoutStatus", filters.payoutStatus);
   }
 
-  if (filters.from) {
+  if (filters.from && (!monthRange || filters.from !== monthRange.from)) {
     params.set("from", filters.from);
   }
 
-  if (filters.to) {
+  if (filters.to && (!monthRange || filters.to !== monthRange.to)) {
     params.set("to", filters.to);
   }
 
@@ -109,7 +159,7 @@ function searchForPayoutFilters(filters: PayoutFilters) {
 function payoutFiltersFromSearch(search: string): PayoutFilters {
   const params = new URLSearchParams(search);
   const payoutStatus = params.get("payoutStatus");
-  const defaults = defaultPayoutFilters();
+  const defaults = defaultPayoutFilters(monthFromSearch(search));
 
   return {
     masterMembershipId: params.get("masterMembershipId") ?? "",
@@ -150,9 +200,7 @@ function groupCommissions(commissions: MasterCommissionListResponse | null): Com
   return Array.from(groups.values());
 }
 
-function hasActiveFilters(filters: PayoutFilters) {
-  const defaults = defaultPayoutFilters();
-
+function hasActiveFilters(filters: PayoutFilters, defaults: PayoutFilters) {
   return (
     filters.masterMembershipId !== defaults.masterMembershipId ||
     filters.payoutStatus !== defaults.payoutStatus ||
@@ -272,9 +320,18 @@ function CommissionTable({
   );
 }
 
-export function AnalyticsPage({ accessToken, user }: { accessToken: string; user: AuthUser }) {
+export function MoneyPayoutsPage({
+  accessToken,
+  navigate,
+  user
+}: {
+  accessToken: string;
+  navigate?: Navigate;
+  user: AuthUser;
+}) {
   const [commissions, setCommissions] = useState<MasterCommissionListResponse | null>(null);
   const [masters, setMasters] = useState<MasterListResponse["items"]>([]);
+  const [baseMonth, setBaseMonth] = useState(() => monthFromSearch(window.location.search));
   const [filters, setFilters] = useState<PayoutFilters>(() => payoutFiltersFromSearch(window.location.search));
   const [isCommissionsLoading, setIsCommissionsLoading] = useState(true);
   const [isMastersLoading, setIsMastersLoading] = useState(true);
@@ -284,6 +341,7 @@ export function AnalyticsPage({ accessToken, user }: { accessToken: string; user
   const [isBulkPaying, setIsBulkPaying] = useState(false);
   const [payoutError, setPayoutError] = useState<string | null>(null);
   const canManageCommissions = ["OWNER", "ADMIN"].includes(user.role);
+  const defaultFilters = useMemo(() => defaultPayoutFilters(baseMonth), [baseMonth]);
   const commissionGroups = useMemo(() => groupCommissions(commissions), [commissions]);
   const unpaidCommissions = useMemo(
     () => (commissions?.items ?? []).filter((commission) => commission.commissionPayoutStatus === "UNPAID"),
@@ -345,6 +403,7 @@ export function AnalyticsPage({ accessToken, user }: { accessToken: string; user
 
   useEffect(() => {
     function handlePopState() {
+      setBaseMonth(monthFromSearch(window.location.search));
       setFilters(payoutFiltersFromSearch(window.location.search));
     }
 
@@ -353,17 +412,22 @@ export function AnalyticsPage({ accessToken, user }: { accessToken: string; user
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  function updateFilters(patch: Partial<PayoutFilters>) {
+  function updateFilters(patch: Partial<PayoutFilters>, nextBaseMonth = baseMonth) {
+    setBaseMonth(nextBaseMonth);
     setFilters((current) => {
       const next = {
         ...current,
         ...patch
       };
 
-      window.history.replaceState(null, "", `/analytics${searchForPayoutFilters(next)}`);
+      window.history.replaceState(null, "", `/money/payouts${searchForPayoutFilters(next, nextBaseMonth)}`);
 
       return next;
     });
+  }
+
+  function updateMonth(nextMonth: string) {
+    updateFilters(dateRangeForMonth(nextMonth), nextMonth);
   }
 
   async function markCommissionPaid(commission: MasterCommissionResponse) {
@@ -409,7 +473,7 @@ export function AnalyticsPage({ accessToken, user }: { accessToken: string; user
   if (!canManageCommissions) {
     return (
       <div>
-        <PageToolbar title="Выплаты мастерам" />
+        <PageToolbar back={navigate ? () => navigate({ section: "money", view: "overview", month: baseMonth ?? undefined }) : undefined} title="Выплаты мастерам" />
         <GlassPanel className="p-5">
           <p className="text-white/62">Раздел доступен владельцу и администратору.</p>
         </GlassPanel>
@@ -420,10 +484,16 @@ export function AnalyticsPage({ accessToken, user }: { accessToken: string; user
   return (
     <div>
       <PageToolbar
+        back={navigate ? () => navigate({ section: "money", view: "overview", month: baseMonth ?? undefined }) : undefined}
         action={
-          <GhostButton disabled={isCommissionsLoading} onClick={() => void refreshCommissions()} type="button">
+          <GhostButton
+            aria-label="Обновить выплаты"
+            className="h-10 w-10 px-0"
+            disabled={isCommissionsLoading}
+            onClick={() => void refreshCommissions()}
+            type="button"
+          >
             <RotateCcw aria-hidden="true" size={16} />
-            Обновить
           </GhostButton>
         }
         count={commissions?.items.length ?? 0}
@@ -441,6 +511,23 @@ export function AnalyticsPage({ accessToken, user }: { accessToken: string; user
       </div>
 
       <GlassPanel className="mt-4 p-4">
+        {baseMonth ? (
+          <div className="mx-auto mb-4 grid w-full max-w-md grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2">
+            <GhostButton aria-label="Предыдущий месяц" className="h-11 w-11 px-0" onClick={() => updateMonth(shiftMonth(baseMonth, -1))}>
+              <ChevronLeft aria-hidden="true" size={18} />
+            </GhostButton>
+            <button
+              className="min-w-0 rounded-lg border border-white/[0.08] bg-white/[0.055] px-4 py-3 text-center text-lg font-semibold tracking-normal text-white shadow-inner-glass transition-colors hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30"
+              onClick={() => updateMonth(currentMonthValue())}
+              type="button"
+            >
+              {monthLabel(baseMonth)}
+            </button>
+            <GhostButton aria-label="Следующий месяц" className="h-11 w-11 px-0" onClick={() => updateMonth(shiftMonth(baseMonth, 1))}>
+              <ChevronRight aria-hidden="true" size={18} />
+            </GhostButton>
+          </div>
+        ) : null}
         <div className="grid gap-3 lg:grid-cols-[minmax(180px,1fr)_minmax(150px,0.7fr)_minmax(150px,0.7fr)_minmax(150px,0.7fr)_auto]">
           <SelectField
             disabled={isMastersLoading}
@@ -469,21 +556,21 @@ export function AnalyticsPage({ accessToken, user }: { accessToken: string; user
           </SelectField>
           <TextField
             label="Начислено с"
-            onChange={(event) => updateFilters({ from: event.target.value })}
+            onChange={(event) => updateFilters({ from: event.target.value }, null)}
             type="date"
             value={filters.from}
           />
           <TextField
             label="Начислено по"
-            onChange={(event) => updateFilters({ to: event.target.value })}
+            onChange={(event) => updateFilters({ to: event.target.value }, null)}
             type="date"
             value={filters.to}
           />
           <div className="flex items-end">
             <GhostButton
               className="w-full"
-              disabled={!hasActiveFilters(filters)}
-              onClick={() => updateFilters(defaultPayoutFilters())}
+              disabled={!hasActiveFilters(filters, defaultFilters)}
+              onClick={() => updateFilters(defaultFilters)}
               type="button"
             >
               Сбросить

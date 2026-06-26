@@ -3,6 +3,16 @@ import { z } from "zod";
 import { optionalPhoneSchema, roleSchema, taxModeSchema } from "./common.js";
 
 const referenceNameSchema = z.string().trim().min(2).max(80);
+export const supportedPaymentMethodNames = ["Наличные", "Перевод"] as const;
+export type SupportedPaymentMethodName = (typeof supportedPaymentMethodNames)[number];
+
+export function isSupportedPaymentMethodName(name: string): name is SupportedPaymentMethodName {
+  return (supportedPaymentMethodNames as readonly string[]).includes(name.trim());
+}
+
+const paymentMethodNameSchema = referenceNameSchema.refine(isSupportedPaymentMethodName, {
+  message: "Payment method must be Наличные or Перевод"
+});
 const sortOrderSchema = z.number().int().min(0).max(10_000).optional();
 const colorSchema = z
   .string()
@@ -37,12 +47,12 @@ export const paymentMethodListResponseSchema = z.object({
 });
 
 export const createPaymentMethodSchema = z.object({
-  name: referenceNameSchema,
+  name: paymentMethodNameSchema,
   sortOrder: sortOrderSchema
 });
 
 export const updatePaymentMethodSchema = z.object({
-  name: referenceNameSchema.optional(),
+  name: paymentMethodNameSchema.optional(),
   isActive: z.boolean().optional(),
   sortOrder: sortOrderSchema
 });

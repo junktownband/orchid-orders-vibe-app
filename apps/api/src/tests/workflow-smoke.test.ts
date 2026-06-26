@@ -180,7 +180,7 @@ function paidOrderRecord(overrides: Record<string, unknown> = {}) {
         paidAt: new Date("2026-06-15T09:00:00.000Z"),
         paymentMethodId: "method-1",
         paymentMethod: {
-          name: "Cash"
+          name: "Наличные"
         },
         acceptedBy: {
           name: "Owner"
@@ -208,7 +208,7 @@ function expenseRecord(overrides: Record<string, unknown> = {}) {
     },
     paymentMethodId: "method-1",
     paymentMethod: {
-      name: "Cash"
+      name: "Наличные"
     },
     repairOrderId: "repair-1",
     repairOrder: {
@@ -279,7 +279,7 @@ describe("API workflow smoke", () => {
     authRepository.findMembershipContext.mockResolvedValue(authContext());
     repairOrdersRepository.findMastersByIds.mockResolvedValue([{ id: "member-1" }]);
     repairOrdersRepository.findServiceCatalogItems.mockResolvedValue([{ id: "service-1" }]);
-    settingsRepository.findActivePaymentMethod.mockResolvedValue({ id: "method-1" });
+    settingsRepository.findActivePaymentMethod.mockResolvedValue({ id: "method-1", name: "Наличные" });
     settingsRepository.findActiveExpenseCategory.mockResolvedValue({ id: "category-1" });
     settingsRepository.getOrCreateOrganizationSettings.mockResolvedValue({ taxMode: "NONE" });
     auditService.writeAuditLog.mockResolvedValue(undefined);

@@ -118,13 +118,13 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  acceptedPayments Payment[]         @relation("PaymentAcceptedBy")
-  auditLogs        AuditLog[]
-  createdExpenses  Expense[]         @relation("ExpenseCreatedBy")
+  acceptedPayments         Payment[]          @relation("PaymentAcceptedBy")
+  auditLogs                AuditLog[]
+  createdExpenses          Expense[]          @relation("ExpenseCreatedBy")
   createdFinanceOperations FinanceOperation[] @relation("FinanceOperationCreatedBy")
-  memberships      Membership[]
-  paidCommissions  RepairOrderItem[] @relation("RepairOrderItemCommissionPaidBy")
-  paidRepairOrders RepairOrder[]     @relation("RepairOrderPaidBy")
+  memberships              Membership[]
+  paidCommissions          RepairOrderItem[]  @relation("RepairOrderItemCommissionPaidBy")
+  paidRepairOrders         RepairOrder[]      @relation("RepairOrderPaidBy")
 }
 
 model Membership {
@@ -359,6 +359,7 @@ model FinanceOperation {
   id              String               @id @default(cuid())
   organizationId  String
   createdByUserId String?
+  paymentMethodId String?
   type            FinanceOperationType
   amountCents     Int
   occurredAt      DateTime
@@ -367,11 +368,13 @@ model FinanceOperation {
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
-  createdBy    User?        @relation("FinanceOperationCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy     User?          @relation("FinanceOperationCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  paymentMethod PaymentMethod? @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, occurredAt])
   @@index([organizationId, type])
+  @@index([organizationId, paymentMethodId])
 }
 
 model PaymentMethod {
@@ -383,9 +386,10 @@ model PaymentMethod {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  expenses     Expense[]
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  payments     Payment[]
+  expenses          Expense[]
+  financeOperations FinanceOperation[]
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  payments          Payment[]
 
   @@unique([organizationId, name])
 }

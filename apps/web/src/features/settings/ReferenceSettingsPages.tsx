@@ -23,9 +23,9 @@ type DraftReferenceItem = {
 const defaultsByKind = {
   "payment-methods": {
     title: "Способы оплаты",
-    subtitle: "Активные способы используются в оплате заказов и обычных расходах.",
-    createLabel: "Новый способ",
-    placeholder: "Например, Наличные"
+    subtitle: "В оплатах заказов и расходах используются только Наличные и Перевод.",
+    createLabel: "Добавить разрешенный способ",
+    placeholder: "Наличные или Перевод"
   },
   "expense-categories": {
     title: "Категории расходов",

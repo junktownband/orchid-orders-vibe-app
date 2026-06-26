@@ -8,6 +8,7 @@ import {
   phoneTelHref,
   phoneValueForApi,
   requestPathForOrders,
+  screenForUser,
   screenFromLocation
 } from "./app-core";
 
@@ -49,12 +50,48 @@ describe("app routing helpers", () => {
     expect(pathForScreen(screen)).toBe("/expenses/new?orderId=order-1&itemId=item-1");
   });
 
-  it("keeps money route only for owners and admins", () => {
+  it("keeps money as the finance entry point and limits sensitive views", () => {
     expect(pathForScreen(screenFromLocation(locationFor("/money")))).toBe("/money");
+    expect(pathForScreen(screenFromLocation(locationFor("/money/expenses")))).toBe("/money/expenses");
+    expect(pathForScreen(screenFromLocation(locationFor("/money/expenses/new")))).toBe("/money/expenses/new");
+    expect(pathForScreen(screenFromLocation(locationFor("/money/expenses/new", "?month=2026-06")))).toBe(
+      "/money/expenses/new?month=2026-06"
+    );
+    expect(pathForScreen(screenFromLocation(locationFor("/money/payouts")))).toBe("/money/payouts");
+    expect(pathForScreen(screenFromLocation(locationFor("/money/ledger")))).toBe("/money/ledger");
+    expect(pathForScreen(screenFromLocation(locationFor("/money/ledger", "?month=2026-06")))).toBe(
+      "/money/ledger?month=2026-06"
+    );
+    expect(pathForScreen(screenFromLocation(locationFor("/money/receivables")))).toBe("/money/receivables");
+    expect(pathForScreen(screenFromLocation(locationFor("/money/audit")))).toBe("/money/audit");
     expect(navItemsForUser({ role: "OWNER" }).map((item) => item.section)).toContain("money");
     expect(navItemsForUser({ role: "ADMIN" }).map((item) => item.section)).toContain("money");
-    expect(navItemsForUser({ role: "MANAGER" }).map((item) => item.section)).not.toContain("money");
+    expect(navItemsForUser({ role: "MANAGER" }).map((item) => item.section)).toContain("money");
     expect(navItemsForUser({ role: "MASTER" }).map((item) => item.section)).not.toContain("money");
+    expect(screenForUser({ role: "MANAGER" }, { section: "money", view: "overview" })).toEqual({
+      section: "money",
+      view: "expenses"
+    });
+    expect(screenForUser({ role: "MANAGER" }, { section: "money", view: "expenses" })).toEqual({
+      section: "money",
+      view: "expenses"
+    });
+    expect(screenForUser({ role: "MANAGER" }, { section: "money", view: "expense-create" })).toEqual({
+      section: "money",
+      view: "expense-create"
+    });
+    expect(screenForUser({ role: "MANAGER" }, { section: "money", view: "ledger" })).toEqual({
+      section: "money",
+      view: "expenses"
+    });
+    expect(screenForUser({ role: "MANAGER" }, { section: "money", view: "receivables" })).toEqual({
+      section: "money",
+      view: "expenses"
+    });
+    expect(screenForUser({ role: "MANAGER" }, { section: "money", view: "audit" })).toEqual({
+      section: "money",
+      view: "expenses"
+    });
   });
 
   it("defaults order list filters to the last 60 days", () => {

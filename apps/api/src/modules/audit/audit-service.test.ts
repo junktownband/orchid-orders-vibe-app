@@ -51,4 +51,18 @@ describe("audit service", () => {
       action: "ISSUE"
     });
   });
+
+  it("passes finance scope to the audit repository", async () => {
+    await expect(
+      getAuditLogs(adminAuth, {
+        limit: 50,
+        scope: "finance"
+      })
+    ).resolves.toEqual({ items: [] });
+
+    expect(repository.listAuditLogs).toHaveBeenCalledWith("org-1", {
+      limit: 50,
+      scope: "finance"
+    });
+  });
 });

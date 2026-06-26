@@ -64,7 +64,7 @@ export function SettingsProfilePage({
               </span>
               <span className="mt-5 block text-2xl font-semibold">Способы оплаты</span>
               <span className="mt-2 block max-w-xl text-sm leading-6 text-white/55">
-                Наличные, перевод, терминал и другие способы для оплат заказов и обычных расходов.
+                Только два способа оплаты: наличные и перевод.
               </span>
             </button>
             <button

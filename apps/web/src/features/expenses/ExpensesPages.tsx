@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, RotateCcw, X } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import type {
@@ -12,10 +12,13 @@ import type {
 
 import {
   authHeaders,
+  dateTime,
   displayOrderNumber,
+  errorMessage,
   money,
   orderSearchResultTitle,
   parsedMoneyOrZero,
+  recentDateRange,
   request,
   rubToCents,
   type Screen
@@ -33,6 +36,114 @@ import {
   TextAreaField,
   TextField
 } from "../../app/ui";
+
+type ExpenseFilters = {
+  from: string;
+  to: string;
+  createdByUserId: string;
+  status: ExpenseResponse["status"] | "";
+};
+
+function currentMonthValue(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function shiftMonth(value: string, delta: number) {
+  const [year, month] = value.split("-").map(Number);
+  const date = new Date(year, month - 1 + delta, 1);
+
+  return currentMonthValue(date);
+}
+
+function monthLabel(value: string) {
+  const [year, month] = value.split("-").map(Number);
+  const label = new Intl.DateTimeFormat("ru-RU", {
+    month: "long",
+    year: "numeric"
+  }).format(new Date(year, month - 1, 1));
+
+  return label.replace(/^./u, (letter) => letter.toLocaleUpperCase("ru-RU"));
+}
+
+function dateRangeForMonth(value: string) {
+  const [year, month] = value.split("-").map(Number);
+  const from = `${value}-01`;
+  const toDate = new Date(year, month, 0);
+  const to = `${toDate.getFullYear()}-${String(toDate.getMonth() + 1).padStart(2, "0")}-${String(toDate.getDate()).padStart(2, "0")}`;
+
+  return { from, to };
+}
+
+function monthFromSearch(search: string) {
+  const month = new URLSearchParams(search).get("month");
+
+  return month && /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? month : null;
+}
+
+function defaultExpenseFilters(month?: string | null): ExpenseFilters {
+  return {
+    ...(month ? dateRangeForMonth(month) : recentDateRange(60)),
+    createdByUserId: "",
+    status: ""
+  };
+}
+
+function expenseFiltersFromSearch(search: string): ExpenseFilters {
+  const params = new URLSearchParams(search);
+  const defaults = defaultExpenseFilters(monthFromSearch(search));
+  const status = params.get("status");
+
+  return {
+    from: params.get("from") ?? defaults.from,
+    to: params.get("to") ?? defaults.to,
+    createdByUserId: params.get("createdByUserId") ?? "",
+    status: status === "DRAFT" || status === "CONFIRMED" || status === "VOIDED" ? status : ""
+  };
+}
+
+function searchForExpenseFilters(filters: ExpenseFilters, month?: string | null) {
+  const params = new URLSearchParams();
+  const monthRange = month ? dateRangeForMonth(month) : null;
+
+  if (month) {
+    params.set("month", month);
+  }
+
+  if (filters.from && (!monthRange || filters.from !== monthRange.from)) {
+    params.set("from", filters.from);
+  }
+
+  if (filters.to && (!monthRange || filters.to !== monthRange.to)) {
+    params.set("to", filters.to);
+  }
+
+  if (filters.createdByUserId) {
+    params.set("createdByUserId", filters.createdByUserId);
+  }
+
+  if (filters.status) {
+    params.set("status", filters.status);
+  }
+
+  const search = params.toString();
+
+  return search ? `?${search}` : "";
+}
+
+function pathForExpenseFilters(filters: ExpenseFilters) {
+  const search = searchForExpenseFilters(filters);
+
+  return `/api/v1/expenses${search}${search ? "&" : "?"}limit=160`;
+}
+
+function hasActiveExpenseFilters(filters: ExpenseFilters, defaults: ExpenseFilters) {
+  return (
+    filters.from !== defaults.from ||
+    filters.to !== defaults.to ||
+    filters.createdByUserId !== defaults.createdByUserId ||
+    filters.status !== defaults.status
+  );
+}
 
 function expenseKindLabel(kind: ExpenseResponse["kind"]) {
   if (kind === "TAX") {
@@ -78,6 +189,9 @@ export function ExpensesListPage({
   navigate: (screen: Screen) => void;
 }) {
   const [expenses, setExpenses] = useState<ExpenseResponse[]>([]);
+  const [authors, setAuthors] = useState<ExpenseListResponse["authors"]>([]);
+  const [baseMonth, setBaseMonth] = useState(() => monthFromSearch(window.location.search));
+  const [filters, setFilters] = useState<ExpenseFilters>(() => expenseFiltersFromSearch(window.location.search));
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expenseToConfirm, setExpenseToConfirm] = useState<ExpenseResponse | null>(null);
@@ -85,15 +199,63 @@ export function ExpensesListPage({
   const [voidReason, setVoidReason] = useState("");
   const [confirmingExpenseId, setConfirmingExpenseId] = useState<string | null>(null);
   const [voidingExpenseId, setVoidingExpenseId] = useState<string | null>(null);
+  const defaultFilters = useMemo(() => defaultExpenseFilters(baseMonth), [baseMonth]);
 
-  useEffect(() => {
-    request<ExpenseListResponse>("/api/v1/expenses", {
+  function refresh(nextFilters = filters) {
+    setIsLoading(true);
+    setError(null);
+
+    return request<ExpenseListResponse>(pathForExpenseFilters(nextFilters), {
       headers: authHeaders(accessToken)
     })
-      .then((response) => setExpenses(response.items))
-      .catch(() => setError("Не удалось загрузить расходы."))
+      .then((response) => {
+        setExpenses(response.items);
+        setAuthors(response.authors ?? []);
+      })
+      .catch((requestError) => {
+        setExpenses([]);
+        setAuthors([]);
+        setError(errorMessage(requestError, "Не удалось загрузить расходы."));
+      })
       .finally(() => setIsLoading(false));
+  }
+
+  useEffect(() => {
+    void refresh(filters);
   }, [accessToken]);
+
+  useEffect(() => {
+    function handlePopState() {
+      setBaseMonth(monthFromSearch(window.location.search));
+      const nextFilters = expenseFiltersFromSearch(window.location.search);
+
+      setFilters(nextFilters);
+      void refresh(nextFilters);
+    }
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [accessToken]);
+
+  function updateFilters(patch: Partial<ExpenseFilters>, nextBaseMonth = baseMonth) {
+    setBaseMonth(nextBaseMonth);
+    setFilters((current) => {
+      const next = {
+        ...current,
+        ...patch
+      };
+
+      window.history.replaceState(null, "", `/money/expenses${searchForExpenseFilters(next, nextBaseMonth)}`);
+      void refresh(next);
+
+      return next;
+    });
+  }
+
+  function updateMonth(nextMonth: string) {
+    updateFilters(dateRangeForMonth(nextMonth), nextMonth);
+  }
 
   const totals = useMemo(
     () =>
@@ -161,15 +323,89 @@ export function ExpensesListPage({
   return (
     <div>
       <PageToolbar
+        back={() => navigate({ section: "money", view: "overview", month: baseMonth ?? undefined })}
         action={
-          <PrimaryButton onClick={() => navigate({ section: "expenses", view: "create" })}>
-            <Plus size={17} />
-            Новый расход
-          </PrimaryButton>
+          <div className="flex items-center gap-2">
+            <GhostButton
+              aria-label="Обновить расходы"
+              className="h-10 w-10 px-0"
+              disabled={isLoading}
+              onClick={() => void refresh()}
+              type="button"
+            >
+              <RotateCcw aria-hidden="true" size={16} />
+            </GhostButton>
+            <PrimaryButton onClick={() => navigate({ section: "money", view: "expense-create", month: baseMonth ?? undefined })}>
+              <Plus size={17} />
+              Новый расход
+            </PrimaryButton>
+          </div>
         }
         count={expenses.length}
         title="Расходы"
       />
+
+      <GlassPanel className="mb-4 p-4">
+        {baseMonth ? (
+          <div className="mx-auto mb-4 grid w-full max-w-md grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2">
+            <GhostButton aria-label="Предыдущий месяц" className="h-11 w-11 px-0" onClick={() => updateMonth(shiftMonth(baseMonth, -1))}>
+              <ChevronLeft aria-hidden="true" size={18} />
+            </GhostButton>
+            <button
+              className="min-w-0 rounded-lg border border-white/[0.08] bg-white/[0.055] px-4 py-3 text-center text-lg font-semibold tracking-normal text-white shadow-inner-glass transition-colors hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30"
+              onClick={() => updateMonth(currentMonthValue())}
+              type="button"
+            >
+              {monthLabel(baseMonth)}
+            </button>
+            <GhostButton aria-label="Следующий месяц" className="h-11 w-11 px-0" onClick={() => updateMonth(shiftMonth(baseMonth, 1))}>
+              <ChevronRight aria-hidden="true" size={18} />
+            </GhostButton>
+          </div>
+        ) : null}
+        <div className="grid gap-3 lg:grid-cols-[minmax(140px,0.75fr)_minmax(140px,0.75fr)_minmax(180px,1fr)_minmax(150px,0.8fr)_auto]">
+          <TextField
+            label="С"
+            onChange={(event) => updateFilters({ from: event.target.value }, null)}
+            type="date"
+            value={filters.from}
+          />
+          <TextField
+            label="По"
+            onChange={(event) => updateFilters({ to: event.target.value }, null)}
+            type="date"
+            value={filters.to}
+          />
+          <SelectField
+            label="Кто внес"
+            onChange={(event) => updateFilters({ createdByUserId: event.target.value })}
+            value={filters.createdByUserId}
+          >
+            <option value="">Все авторы</option>
+            {authors.map((author) => (
+              <option key={author.id} value={author.id}>
+                {author.name}
+              </option>
+            ))}
+          </SelectField>
+          <SelectField
+            label="Статус"
+            onChange={(event) => updateFilters({ status: event.target.value as ExpenseFilters["status"] })}
+            value={filters.status}
+          >
+            <option value="">Все статусы</option>
+            <option value="DRAFT">Черновик</option>
+            <option value="CONFIRMED">Подтвержден</option>
+            <option value="VOIDED">Отменен</option>
+          </SelectField>
+          <div className="flex items-end gap-2">
+            <GhostButton className="h-11 w-full lg:w-11 lg:px-0" disabled={!hasActiveExpenseFilters(filters, defaultFilters)} onClick={() => updateFilters(defaultFilters)}>
+              <X aria-hidden="true" size={16} />
+              <span className="lg:sr-only">Сбросить</span>
+            </GhostButton>
+          </div>
+        </div>
+      </GlassPanel>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard label="Подтверждено" tone="text-mint" value={money(totals.confirmed)} />
@@ -190,12 +426,14 @@ export function ExpensesListPage({
         {!isLoading && expenses.length > 0 ? (
           <GlassPanel className="hidden overflow-hidden lg:block">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[860px] border-collapse text-left text-sm">
+              <table className="w-full min-w-[1040px] border-collapse text-left text-sm">
                 <thead className="bg-white/[0.045] text-xs uppercase tracking-normal text-white/42">
                   <tr>
+                    <th className="px-4 py-3 font-medium">Дата</th>
                     <th className="px-4 py-3 font-medium">Расход</th>
                     <th className="px-4 py-3 font-medium">Статус</th>
                     <th className="px-4 py-3 font-medium">Тип</th>
+                    <th className="px-4 py-3 font-medium">Внес</th>
                     <th className="px-4 py-3 font-medium">Связь</th>
                     <th className="px-4 py-3 font-medium">Оплата</th>
                     <th className="px-4 py-3 text-right font-medium">Сумма</th>
@@ -205,6 +443,7 @@ export function ExpensesListPage({
                 <tbody className="divide-y divide-white/[0.08]">
                   {expenses.map((expense) => (
                     <tr key={expense.id} className="align-top transition-colors hover:bg-white/[0.035]">
+                      <td className="px-4 py-3 text-white/55">{dateTime(expense.spentAt)}</td>
                       <td className="max-w-[260px] px-4 py-3">
                         <p className="font-medium text-white">{expense.description}</p>
                         {expense.categoryName ? <p className="mt-1 text-xs text-white/45">{expense.categoryName}</p> : null}
@@ -213,6 +452,7 @@ export function ExpensesListPage({
                         <StatusPill label={expenseStatusLabel(expense.status)} tone={expenseStatusTone(expense.status)} />
                       </td>
                       <td className="px-4 py-3 text-white/62">{expenseKindLabel(expense.kind)}</td>
+                      <td className="px-4 py-3 text-white/62">{expense.createdByName ?? "Не указан"}</td>
                       <td className="px-4 py-3 text-white/62">
                         {expense.repairOrderNumber ? (
                           <>
@@ -271,6 +511,9 @@ export function ExpensesListPage({
                 <p className="mt-1 text-sm text-white/45">
                   {expense.repairOrderNumber ? `Заказ ${displayOrderNumber(expense.repairOrderNumber)}` : "Общий расход"}
                   {expense.repairOrderItemName ? ` · ${expense.repairOrderItemName}` : ""}
+                </p>
+                <p className="mt-1 text-xs text-white/40">
+                  {dateTime(expense.spentAt)} · внес {expense.createdByName ?? "не указан"}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2 text-xs">
                   {expense.categoryName ? (
@@ -408,6 +651,12 @@ export function ExpenseCreatePage({
   const [orderSearchError, setOrderSearchError] = useState<string | null>(null);
   const trimmedOrderSearch = orderSearch.trim();
   const hasOrderContext = Boolean(orderId);
+  const isMoneyExpenseFlow = window.location.pathname.startsWith("/money/expenses");
+  const returnMonth = monthFromSearch(window.location.search);
+  const returnToExpenseList = () =>
+    isMoneyExpenseFlow
+      ? navigate({ section: "money", view: "expenses", month: returnMonth ?? undefined })
+      : navigate({ section: "expenses", view: "list" });
 
   useEffect(() => {
     const headers = authHeaders(accessToken);
@@ -576,7 +825,7 @@ export function ExpenseCreatePage({
       if (orderId) {
         navigate({ section: "orders", view: "detail", orderId });
       } else {
-        navigate({ section: "expenses", view: "list" });
+        returnToExpenseList();
       }
     } catch {
       setError("Не удалось создать расход. Проверьте сумму и описание.");
@@ -591,7 +840,7 @@ export function ExpenseCreatePage({
         back={() =>
           orderId
             ? navigate({ section: "orders", view: "detail", orderId })
-            : navigate({ section: "expenses", view: "list" })
+            : returnToExpenseList()
         }
         title={orderId ? "Расход по заказу" : "Новый расход"}
       />
@@ -619,8 +868,13 @@ export function ExpenseCreatePage({
                   </option>
                 ))}
               </SelectField>
-              <SelectField label="Способ оплаты" onChange={(event) => setPaymentMethodId(event.target.value)} value={paymentMethodId}>
-                <option value="">Не указан</option>
+              <SelectField
+                disabled={paymentMethods.length === 0}
+                label="Способ оплаты"
+                onChange={(event) => setPaymentMethodId(event.target.value)}
+                value={paymentMethodId}
+              >
+                <option value="">{paymentMethods.length === 0 ? "Загружаем..." : "Выберите способ"}</option>
                 {paymentMethods.map((method) => (
                   <option key={method.id} value={method.id}>
                     {method.name}
@@ -757,7 +1011,7 @@ export function ExpenseCreatePage({
               </div>
             ) : null}
             {error ? <p className="text-sm text-coral">{error}</p> : null}
-            <PrimaryButton disabled={isCreating} type="submit">
+            <PrimaryButton disabled={isCreating || paymentMethods.length === 0 || !paymentMethodId} type="submit">
               {isCreating ? "Сохраняем..." : "Добавить расход"}
             </PrimaryButton>
           </form>

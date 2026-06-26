@@ -32,4 +32,27 @@ describe("AuditLogPage", () => {
       );
     });
   });
+
+  it("loads only finance audit events in money mode", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(auditLogResponse));
+
+    window.history.replaceState(null, "", "/money/audit?entityType=Expense&action=CREATE");
+
+    render(<AuditLogPage accessToken="access-token" mode="money" navigate={vi.fn()} />);
+
+    expect(await screen.findByRole("heading", { name: "Финансовый журнал" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Сущность")).toHaveValue("Expense");
+    expect(screen.queryByRole("option", { name: "Клиенты" })).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/v1/audit?limit=50&scope=finance&entityType=Expense&action=CREATE",
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: "Bearer access-token"
+          })
+        })
+      );
+    });
+  });
 });

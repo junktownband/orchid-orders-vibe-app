@@ -211,7 +211,7 @@ async function seedReferenceData() {
     }
   });
 
-  const paymentMethods = ["Наличные", "Перевод", "Терминал", "Другое"];
+  const paymentMethods = ["Наличные", "Перевод"];
 
   for (const [index, name] of paymentMethods.entries()) {
     await prisma.paymentMethod.upsert({
@@ -237,7 +237,9 @@ async function seedReferenceData() {
   await prisma.paymentMethod.updateMany({
     where: {
       organizationId,
-      name: "Карта"
+      name: {
+        in: ["Терминал", "Другое", "Карта"]
+      }
     },
     data: {
       isActive: false

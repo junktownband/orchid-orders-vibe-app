@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 
-import { createExpenseSchema, voidExpenseSchema } from "@orchid/shared";
+import { createExpenseSchema, expenseQuerySchema, voidExpenseSchema } from "@orchid/shared";
 
 import { authenticate, AuthError } from "../auth/service.js";
 import { addExpense, getExpenses, setExpenseConfirmed, setExpenseVoided } from "./service.js";
@@ -25,7 +25,9 @@ export async function expenseRoutes(app: FastifyInstance) {
   app.get("/", async (request, reply) => {
     try {
       const auth = await authenticate(request.headers.authorization);
-      return getExpenses(auth);
+      const query = expenseQuerySchema.parse(request.query);
+
+      return getExpenses(auth, query);
     } catch (error) {
       if (error instanceof AuthError) {
         return sendAuthError(reply, error);

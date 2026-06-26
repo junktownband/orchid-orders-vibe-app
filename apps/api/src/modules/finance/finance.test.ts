@@ -11,8 +11,16 @@ const audit = vi.hoisted(() => ({
   writeAuditLog: vi.fn()
 }));
 
+const settings = vi.hoisted(() => ({
+  assertActivePaymentMethod: vi.fn().mockResolvedValue({
+    id: "method-cash",
+    name: "Наличные"
+  })
+}));
+
 vi.mock("./repository.js", () => repository);
 vi.mock("../audit/service.js", () => audit);
+vi.mock("../settings/service.js", () => settings);
 
 const { addFinanceOperation, getFinanceOverview } = await import("./service.js");
 
@@ -52,7 +60,70 @@ function financeData(overrides: Record<string, unknown> = {}) {
     manualOutflowCents: 10_000,
     repairOrdersCount: 4,
     paidOrdersCount: 2,
+    unpaidOrdersCount: 2,
+    partiallyPaidOrdersCount: 1,
+    receivablesCents: 180_000,
     averagePaidTicketCents: 150_000,
+    analytics: {
+      serviceMix: {
+        standard: {
+          count: 3,
+          revenueCents: 210_000,
+          grossProfitCents: 150_000
+        },
+        custom: {
+          count: 1,
+          revenueCents: 90_000,
+          grossProfitCents: 70_000
+        }
+      },
+      masterWorks: [
+        {
+          masterMembershipId: "master-1",
+          masterName: "Master",
+          servicesCount: 4,
+          standardServicesCount: 3,
+          customServicesCount: 1,
+          revenueCents: 300_000,
+          grossProfitCents: 220_000,
+          commissionCents: 70_000
+        }
+      ],
+      paymentMethods: [
+        {
+          key: "cash",
+          label: "Наличные",
+          inflowCents: 220_000,
+          outflowCents: 40_000,
+          netCents: 180_000,
+          count: 3
+        },
+        {
+          key: "transfer",
+          label: "Перевод",
+          inflowCents: 80_000,
+          outflowCents: 10_000,
+          netCents: 70_000,
+          count: 1
+        }
+      ],
+      expensesByCategory: [
+        {
+          key: "materials",
+          label: "Материалы",
+          amountCents: 50_000,
+          count: 2
+        }
+      ],
+      expensesByCreator: [
+        {
+          key: "owner-user",
+          label: "Owner",
+          amountCents: 50_000,
+          count: 2
+        }
+      ]
+    },
     masterCommissions: [
       {
         masterMembershipId: "master-1",
@@ -65,6 +136,21 @@ function financeData(overrides: Record<string, unknown> = {}) {
         payableItemsCount: 1
       }
     ],
+    receivableOrders: [
+      {
+        id: "repair-2",
+        orderNumber: "00002",
+        customerName: "Анна",
+        instrumentName: "Fender Telecaster",
+        repairStatus: "IN_PROGRESS",
+        paymentStatus: "PARTIALLY_PAID",
+        totalAmountCents: 250_000,
+        paidAmountCents: 70_000,
+        balanceDueCents: 180_000,
+        createdAt: new Date("2026-06-08T10:00:00.000Z"),
+        updatedAt: new Date("2026-06-12T10:00:00.000Z")
+      }
+    ],
     operations: [
       {
         id: "payment-1",
@@ -74,6 +160,8 @@ function financeData(overrides: Record<string, unknown> = {}) {
         amountCents: 300_000,
         occurredAt: new Date("2026-06-10T10:00:00.000Z"),
         description: "Оплата заказа № 00001",
+        paymentMethodId: "method-cash",
+        paymentMethodName: "Наличные",
         counterpartyName: "Петр",
         repairOrderId: "repair-1",
         repairOrderNumber: "00001",
@@ -88,6 +176,8 @@ function financeData(overrides: Record<string, unknown> = {}) {
         amountCents: 30_000,
         occurredAt: new Date("2026-06-11T10:00:00.000Z"),
         description: "Выплата мастеру по заказу № 00001",
+        paymentMethodId: "method-cash",
+        paymentMethodName: "Наличные",
         counterpartyName: "Master",
         repairOrderId: "repair-1",
         repairOrderNumber: "00001",
@@ -128,6 +218,9 @@ describe("finance service", () => {
         manualOutflowCents: 10_000,
         netMovementCents: 260_000,
         repairOrdersCount: 4,
+        unpaidOrdersCount: 2,
+        partiallyPaidOrdersCount: 1,
+        receivablesCents: 180_000,
         averagePaidTicketCents: 150_000
       },
       operations: [
@@ -152,8 +245,64 @@ describe("finance service", () => {
           accruedItemsCount: 2,
           paidItemsCount: 1,
           payableItemsCount: 1
-        }
-      ]
+      }
+    ],
+    receivableOrders: [
+      {
+        id: "repair-2",
+        orderNumber: "00002",
+        customerName: "Анна",
+        balanceDueCents: 180_000,
+        paymentStatus: "PARTIALLY_PAID"
+      }
+    ],
+    analytics: {
+        serviceMix: {
+          standard: {
+            count: 3,
+            revenueCents: 210_000
+          },
+          custom: {
+            count: 1,
+            revenueCents: 90_000
+          }
+        },
+        masterWorks: [
+          {
+            masterName: "Master",
+            servicesCount: 4,
+            commissionCents: 70_000
+          }
+        ],
+        paymentMethods: [
+          {
+            label: "Наличные",
+            inflowCents: 220_000,
+            outflowCents: 40_000,
+            netCents: 180_000,
+            count: 3
+          },
+          {
+            label: "Перевод",
+            inflowCents: 80_000,
+            outflowCents: 10_000,
+            netCents: 70_000,
+            count: 1
+          }
+        ],
+        expensesByCategory: [
+          {
+            label: "Материалы",
+            amountCents: 50_000
+          }
+        ],
+        expensesByCreator: [
+          {
+            label: "Owner",
+            amountCents: 50_000
+          }
+        ]
+      }
     });
 
     expect(repository.getFinanceData).toHaveBeenCalledWith("org-1", {
@@ -168,6 +317,7 @@ describe("finance service", () => {
       id: "manual-1",
       type: "DEPOSIT",
       amountCents: 50_000,
+      paymentMethodId: "method-cash",
       occurredAt: new Date("2026-06-12T10:00:00.000Z"),
       description: "Стартовый остаток",
       comment: null,
@@ -175,6 +325,10 @@ describe("finance service", () => {
       updatedAt: new Date("2026-06-12T10:00:00.000Z"),
       createdBy: {
         name: "Owner"
+      },
+      paymentMethod: {
+        id: "method-cash",
+        name: "Наличные"
       }
     });
 
@@ -191,6 +345,7 @@ describe("finance service", () => {
         {
           type: "DEPOSIT",
           amountCents: 50_000,
+          paymentMethodId: "method-cash",
           occurredAt: "2026-06-12T10:00:00.000Z",
           description: "Стартовый остаток"
         }
@@ -202,11 +357,22 @@ describe("finance service", () => {
       signedAmountCents: 50_000
     });
 
+    expect(settings.assertActivePaymentMethod).toHaveBeenCalledWith("org-1", "method-cash");
+    expect(repository.createManualFinanceOperation).toHaveBeenCalledWith(
+      "org-1",
+      "owner-user",
+      expect.objectContaining({
+        paymentMethodId: "method-cash"
+      })
+    );
     expect(audit.writeAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({ role: "ADMIN" }),
       expect.objectContaining({
         entityType: "FinanceOperation",
-        action: "CREATE"
+        action: "CREATE",
+        afterJson: expect.objectContaining({
+          paymentMethodName: "Наличные"
+        })
       })
     );
   });

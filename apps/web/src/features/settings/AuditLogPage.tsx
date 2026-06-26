@@ -19,13 +19,19 @@ type AuditFilters = {
   entityType: string;
   action: AuditLogResponse["action"] | "";
 };
+type AuditMode = "settings" | "money";
+type AuditScope = "finance";
+type EntityTypeOption = {
+  value: string;
+  label: string;
+};
 
 const emptyFilters: AuditFilters = {
   entityType: "",
   action: ""
 };
 
-const entityTypeOptions = [
+const entityTypeOptions: EntityTypeOption[] = [
   { value: "RepairOrder", label: "Заказы" },
   { value: "RepairOrderItem", label: "Позиции заказов" },
   { value: "Expense", label: "Расходы" },
@@ -35,7 +41,16 @@ const entityTypeOptions = [
   { value: "Membership", label: "Мастера" },
   { value: "OrganizationSetting", label: "Настройки организации" },
   { value: "Customer", label: "Клиенты" }
-] as const;
+];
+
+const financeEntityTypeOptions: EntityTypeOption[] = [
+  { value: "FinanceOperation", label: "Ручные операции" },
+  { value: "Expense", label: "Расходы" },
+  { value: "RepairOrder", label: "Заказы и оплаты" },
+  { value: "RepairOrderItem", label: "Выплаты мастерам" },
+  { value: "PaymentMethod", label: "Способы оплаты" },
+  { value: "ExpenseCategory", label: "Статьи расходов" }
+];
 
 const auditActionValues: AuditLogResponse["action"][] = [
   "CREATE",
@@ -57,13 +72,13 @@ const auditActionOptions = auditActionValues.map((action) => ({
   label: auditActionLabel(action)
 }));
 
-function auditFiltersFromSearch(search: string): AuditFilters {
+function auditFiltersFromSearch(search: string, availableEntityTypeOptions: EntityTypeOption[]): AuditFilters {
   const params = new URLSearchParams(search);
   const entityType = params.get("entityType");
   const action = params.get("action");
 
   return {
-    entityType: entityTypeOptions.some((option) => option.value === entityType) ? entityType ?? "" : "",
+    entityType: availableEntityTypeOptions.some((option) => option.value === entityType) ? entityType ?? "" : "",
     action: auditActionOptions.some((option) => option.value === action) ? (action as AuditLogResponse["action"]) : ""
   };
 }
@@ -84,10 +99,14 @@ function searchForAuditFilters(filters: AuditFilters) {
   return search ? `?${search}` : "";
 }
 
-function requestPathForAudit(filters: AuditFilters) {
+function requestPathForAudit(filters: AuditFilters, scope?: AuditScope) {
   const params = new URLSearchParams();
 
   params.set("limit", "50");
+
+  if (scope) {
+    params.set("scope", scope);
+  }
 
   if (filters.entityType) {
     params.set("entityType", filters.entityType);
@@ -106,13 +125,25 @@ function hasActiveFilters(filters: AuditFilters) {
 
 export function AuditLogPage({
   accessToken,
-  navigate
+  navigate,
+  mode = "settings"
 }: {
   accessToken: string;
   navigate: (screen: Screen) => void;
+  mode?: AuditMode;
 }) {
+  const isMoneyMode = mode === "money";
+  const availableEntityTypeOptions = isMoneyMode ? financeEntityTypeOptions : entityTypeOptions;
+  const scope = isMoneyMode ? "finance" : undefined;
+  const basePath = isMoneyMode ? "/money/audit" : "/settings/audit";
+  const title = isMoneyMode ? "Финансовый журнал" : "Журнал";
+  const backScreen: Screen = isMoneyMode
+    ? { section: "money", view: "overview" }
+    : { section: "settings", view: "profile" };
   const [items, setItems] = useState<AuditLogResponse[]>([]);
-  const [filters, setFilters] = useState<AuditFilters>(() => auditFiltersFromSearch(window.location.search));
+  const [filters, setFilters] = useState<AuditFilters>(() =>
+    auditFiltersFromSearch(window.location.search, availableEntityTypeOptions)
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -121,7 +152,7 @@ export function AuditLogPage({
 
     setIsLoading(true);
     setError(null);
-    request<AuditLogListResponse>(requestPathForAudit(filters), {
+    request<AuditLogListResponse>(requestPathForAudit(filters, scope), {
       headers: authHeaders(accessToken)
     })
       .then((response) => {
@@ -144,17 +175,17 @@ export function AuditLogPage({
     return () => {
       isActive = false;
     };
-  }, [accessToken, filters]);
+  }, [accessToken, filters, scope]);
 
   useEffect(() => {
     function handlePopState() {
-      setFilters(auditFiltersFromSearch(window.location.search));
+      setFilters(auditFiltersFromSearch(window.location.search, availableEntityTypeOptions));
     }
 
     window.addEventListener("popstate", handlePopState);
 
     return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
+  }, [availableEntityTypeOptions]);
 
   function updateFilters(patch: Partial<AuditFilters>) {
     setFilters((current) => {
@@ -163,7 +194,7 @@ export function AuditLogPage({
         ...patch
       };
 
-      window.history.replaceState(null, "", `/settings/audit${searchForAuditFilters(next)}`);
+      window.history.replaceState(null, "", `${basePath}${searchForAuditFilters(next)}`);
 
       return next;
     });
@@ -171,7 +202,7 @@ export function AuditLogPage({
 
   return (
     <div>
-      <PageToolbar back={() => navigate({ section: "settings", view: "profile" })} count={items.length} title="Журнал" />
+      <PageToolbar back={() => navigate(backScreen)} count={items.length} title={title} />
       <GlassPanel className="mb-4 p-4">
         <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
           <SelectField
@@ -180,7 +211,7 @@ export function AuditLogPage({
             value={filters.entityType}
           >
             <option value="">Все сущности</option>
-            {entityTypeOptions.map((option) => (
+            {availableEntityTypeOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

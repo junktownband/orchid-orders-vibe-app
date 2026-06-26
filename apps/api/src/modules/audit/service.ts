@@ -47,6 +47,7 @@ export async function writeAuditLog(auth: AuthContext, data: {
 export async function getAuditLogs(
   auth: AuthContext,
   query: {
+    scope?: "finance";
     entityType?: string;
     entityId?: string;
     action?: AuditAction;

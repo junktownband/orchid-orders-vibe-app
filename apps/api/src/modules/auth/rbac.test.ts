@@ -78,7 +78,7 @@ describe("master RBAC", () => {
   });
 
   it("blocks manager from editing payment and expense references", async () => {
-    await expect(addPaymentMethod(managerAuth, { name: "Касса" })).rejects.toMatchObject({
+    await expect(addPaymentMethod(managerAuth, { name: "Наличные" })).rejects.toMatchObject({
       code: "FORBIDDEN",
       statusCode: 403
     });

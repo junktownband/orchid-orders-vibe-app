@@ -1,5 +1,14 @@
 import { type AuditAction, Prisma, prisma } from "@orchid/db";
 
+const financeAuditEntityTypes = [
+  "FinanceOperation",
+  "Expense",
+  "RepairOrder",
+  "RepairOrderItem",
+  "PaymentMethod",
+  "ExpenseCategory"
+] as const;
+
 function auditJson(value: unknown): Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue | undefined {
   if (value === undefined) {
     return undefined;
@@ -39,16 +48,23 @@ export async function createAuditLogEntry(data: {
 export async function listAuditLogs(
   organizationId: string,
   options: {
+    scope?: "finance";
     entityType?: string;
     entityId?: string;
     action?: AuditAction;
     limit: number;
   }
 ) {
+  const entityType = options.entityType
+    ? options.entityType
+    : options.scope === "finance"
+      ? { in: Array.from(financeAuditEntityTypes) }
+      : undefined;
+
   return prisma.auditLog.findMany({
     where: {
       organizationId,
-      entityType: options.entityType,
+      entityType,
       entityId: options.entityId,
       action: options.action
     },

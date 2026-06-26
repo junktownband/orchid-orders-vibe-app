@@ -7,6 +7,7 @@ import {
   type CreatePaymentMethodInput,
   type ExpenseCategoryListResponse,
   type ExpenseCategoryResponse,
+  isSupportedPaymentMethodName,
   type MemberListResponse,
   type MemberResponse,
   type OrganizationSettingsResponse,
@@ -65,6 +66,16 @@ function assertCanManageTaxSettings(auth: AuthContext) {
 function assertCanManageReferenceSettings(auth: AuthContext) {
   if (!["OWNER", "ADMIN"].includes(auth.role)) {
     throw new AuthError(apiErrorCodes.forbidden, "Forbidden", 403);
+  }
+}
+
+function assertSupportedPaymentMethodName(name: string) {
+  if (!isSupportedPaymentMethodName(name)) {
+    throw new AuthError(
+      apiErrorCodes.validation,
+      "Only cash and transfer payment methods are supported",
+      400
+    );
   }
 }
 
@@ -191,7 +202,7 @@ export async function getPaymentMethods(auth: AuthContext): Promise<PaymentMetho
   const methods = await listPaymentMethods(auth.organizationId, auth.role === "MANAGER");
 
   return {
-    items: methods.map(toPaymentMethodResponse)
+    items: methods.filter((method) => isSupportedPaymentMethodName(method.name)).map(toPaymentMethodResponse)
   };
 }
 
@@ -200,11 +211,13 @@ export async function addPaymentMethod(
   input: CreatePaymentMethodInput
 ): Promise<PaymentMethodResponse> {
   assertCanManageReferenceSettings(auth);
+  const name = input.name.trim();
+  assertSupportedPaymentMethodName(name);
 
   try {
     const method = await createPaymentMethod({
       organizationId: auth.organizationId,
-      name: input.name.trim(),
+      name,
       sortOrder: input.sortOrder
     });
     const response = toPaymentMethodResponse(method);
@@ -229,12 +242,16 @@ export async function editPaymentMethod(
   input: UpdatePaymentMethodInput
 ): Promise<PaymentMethodResponse> {
   assertCanManageReferenceSettings(auth);
+  const name = input.name?.trim();
+  if (name) {
+    assertSupportedPaymentMethodName(name);
+  }
 
   try {
     const method = await updatePaymentMethod({
       organizationId: auth.organizationId,
       id,
-      name: input.name?.trim(),
+      name,
       isActive: input.isActive,
       sortOrder: input.sortOrder
     });
@@ -330,7 +347,7 @@ export async function editExpenseCategory(
 export async function assertActivePaymentMethod(organizationId: string, id: string) {
   const method = await findActivePaymentMethod(organizationId, id);
 
-  if (!method) {
+  if (!method || !isSupportedPaymentMethodName(method.name)) {
     throw new AuthError(apiErrorCodes.notFound, "Payment method not found", 404);
   }
 

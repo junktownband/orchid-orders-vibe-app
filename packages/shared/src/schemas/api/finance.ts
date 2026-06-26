@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { moneyCentsSchema, positiveMoneyCentsSchema } from "./common.js";
+import { moneyCentsSchema, paymentStatusSchema, positiveMoneyCentsSchema, repairStatusSchema } from "./common.js";
 
 const dateOnlySchema = z
   .string()
@@ -40,6 +40,7 @@ export const financeQuerySchema = z
 export const createFinanceOperationSchema = z.object({
   type: financeOperationTypeSchema,
   amountCents: positiveMoneyCentsSchema,
+  paymentMethodId: z.string().min(1),
   occurredAt: z.string().datetime().optional(),
   description: z.string().trim().min(2).max(160),
   comment: z.string().trim().max(500).optional()
@@ -54,6 +55,8 @@ export const financeOperationResponseSchema = z.object({
   signedAmountCents: z.number().int(),
   occurredAt: z.string(),
   description: z.string(),
+  paymentMethodId: z.string().nullable(),
+  paymentMethodName: z.string().nullable(),
   counterpartyName: z.string().nullable(),
   repairOrderId: z.string().nullable(),
   repairOrderNumber: z.string().nullable(),
@@ -70,6 +73,53 @@ export const financeMasterCommissionResponseSchema = z.object({
   accruedItemsCount: z.number().int().nonnegative(),
   paidItemsCount: z.number().int().nonnegative(),
   payableItemsCount: z.number().int().nonnegative()
+});
+
+export const financeReceivableOrderResponseSchema = z.object({
+  id: z.string(),
+  orderNumber: z.string(),
+  customerName: z.string().nullable(),
+  instrumentName: z.string().nullable(),
+  repairStatus: repairStatusSchema,
+  paymentStatus: paymentStatusSchema,
+  totalAmountCents: moneyCentsSchema,
+  paidAmountCents: moneyCentsSchema,
+  balanceDueCents: moneyCentsSchema,
+  createdAt: z.string(),
+  updatedAt: z.string()
+});
+
+const financeServiceBucketSchema = z.object({
+  count: z.number().int().nonnegative(),
+  revenueCents: moneyCentsSchema,
+  grossProfitCents: z.number().int()
+});
+
+export const financeMasterWorkResponseSchema = z.object({
+  masterMembershipId: z.string().nullable(),
+  masterName: z.string(),
+  servicesCount: z.number().int().nonnegative(),
+  standardServicesCount: z.number().int().nonnegative(),
+  customServicesCount: z.number().int().nonnegative(),
+  revenueCents: moneyCentsSchema,
+  grossProfitCents: z.number().int(),
+  commissionCents: moneyCentsSchema
+});
+
+export const financeExpenseBreakdownResponseSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  amountCents: moneyCentsSchema,
+  count: z.number().int().nonnegative()
+});
+
+export const financePaymentMethodBreakdownResponseSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  inflowCents: moneyCentsSchema,
+  outflowCents: moneyCentsSchema,
+  netCents: z.number().int(),
+  count: z.number().int().nonnegative()
 });
 
 export const financeOverviewResponseSchema = z.object({
@@ -94,15 +144,33 @@ export const financeOverviewResponseSchema = z.object({
     netMovementCents: z.number().int(),
     repairOrdersCount: z.number().int().nonnegative(),
     paidOrdersCount: z.number().int().nonnegative(),
+    unpaidOrdersCount: z.number().int().nonnegative(),
+    partiallyPaidOrdersCount: z.number().int().nonnegative(),
+    receivablesCents: moneyCentsSchema,
     averagePaidTicketCents: moneyCentsSchema
   }),
+  analytics: z.object({
+    serviceMix: z.object({
+      standard: financeServiceBucketSchema,
+      custom: financeServiceBucketSchema
+    }),
+    masterWorks: z.array(financeMasterWorkResponseSchema),
+    paymentMethods: z.array(financePaymentMethodBreakdownResponseSchema),
+    expensesByCategory: z.array(financeExpenseBreakdownResponseSchema),
+    expensesByCreator: z.array(financeExpenseBreakdownResponseSchema)
+  }),
   masterCommissions: z.array(financeMasterCommissionResponseSchema),
+  receivableOrders: z.array(financeReceivableOrderResponseSchema),
   operations: z.array(financeOperationResponseSchema)
 });
 
 export type FinanceOperationType = z.infer<typeof financeOperationTypeSchema>;
 export type FinanceOperationResponse = z.infer<typeof financeOperationResponseSchema>;
 export type FinanceMasterCommissionResponse = z.infer<typeof financeMasterCommissionResponseSchema>;
+export type FinanceReceivableOrderResponse = z.infer<typeof financeReceivableOrderResponseSchema>;
+export type FinanceMasterWorkResponse = z.infer<typeof financeMasterWorkResponseSchema>;
+export type FinanceExpenseBreakdownResponse = z.infer<typeof financeExpenseBreakdownResponseSchema>;
+export type FinancePaymentMethodBreakdownResponse = z.infer<typeof financePaymentMethodBreakdownResponseSchema>;
 export type FinanceOverviewResponse = z.infer<typeof financeOverviewResponseSchema>;
 export type FinanceQuery = z.infer<typeof financeQuerySchema>;
 export type CreateFinanceOperationInput = z.infer<typeof createFinanceOperationSchema>;

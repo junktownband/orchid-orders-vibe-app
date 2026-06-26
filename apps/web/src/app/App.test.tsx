@@ -11,6 +11,7 @@ import {
   dashboardResponse,
   expenseCategoriesResponse,
   expensesResponse,
+  financeOverviewResponse,
   jsonResponse,
   mastersResponse,
   membersResponse,
@@ -251,16 +252,30 @@ describe("App", () => {
       expect(screen.getAllByText("60%").length).toBeGreaterThan(0);
     });
 
-    fetchMock.mockResolvedValueOnce(jsonResponse(expensesResponse));
-    fireEvent.click(screen.getByLabelText("Расходы"));
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(financeOverviewResponse))
+      .mockResolvedValueOnce(jsonResponse(expensesResponse));
+    fireEvent.click(screen.getByLabelText("Деньги"));
+    expect(await screen.findByText("Финансовая позиция")).toBeInTheDocument();
+    expect((await screen.findAllByText("Дебиторка")).length).toBeGreaterThan(0);
+    expect(screen.getByText(/2 заказа ждут оплаты/)).toBeInTheDocument();
+    expect(await screen.findByText("Наличные и перевод")).toBeInTheDocument();
+    expect(await screen.findByText("Наличные")).toBeInTheDocument();
+    expect(await screen.findByText("Перевод")).toBeInTheDocument();
+    expect(screen.getByText("Стандартные и нестандартные")).toBeInTheDocument();
+    expect(screen.getByText("Работы по мастерам")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Расходы" }));
     expect(await screen.findByRole("heading", { name: "Расходы" })).toBeInTheDocument();
     expectNoMojibake(baseElement);
     expect(screen.getByRole("button", { name: "Новый расход" })).toBeInTheDocument();
 
     fetchMock
+      .mockResolvedValueOnce(jsonResponse(financeOverviewResponse))
       .mockResolvedValueOnce(jsonResponse(mastersResponse))
       .mockResolvedValueOnce(jsonResponse(commissionsResponse));
-    fireEvent.click(screen.getByLabelText("Выплаты"));
+    fireEvent.click(screen.getByLabelText("Деньги"));
+    expect(await screen.findByText("Финансовая позиция")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Выплаты мастерам" }));
     expect(await screen.findByRole("heading", { name: "Выплаты мастерам" })).toBeInTheDocument();
     expectNoMojibake(baseElement);
     expect(await screen.findByText("Реестр комиссий")).toBeInTheDocument();
@@ -316,6 +331,79 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Войти" })).toBeInTheDocument();
     });
+  });
+
+  it("opens dedicated money operation dialogs from the finance overview", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse(authResponse))
+      .mockResolvedValueOnce(jsonResponse(dashboardResponse))
+      .mockResolvedValueOnce(jsonResponse(financeOverviewResponse))
+      .mockResolvedValueOnce(jsonResponse(paymentMethodsResponse))
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            id: "manual-1",
+            source: "MANUAL",
+            type: "DEPOSIT",
+            direction: "IN",
+            amountCents: 25_000,
+            signedAmountCents: 25_000,
+            occurredAt: "2026-06-12T10:00:00.000Z",
+            description: "Пополнение счета",
+            paymentMethodId: "payment-method-2",
+            paymentMethodName: "Перевод",
+            counterpartyName: null,
+            repairOrderId: null,
+            repairOrderNumber: null,
+            createdByName: "Саша",
+            comment: null
+          },
+          { status: 201 }
+        )
+      )
+      .mockResolvedValueOnce(jsonResponse(financeOverviewResponse));
+
+    render(<App />);
+
+    await screen.findByLabelText("Заказы");
+    await screen.findByText("Актуально");
+    fireEvent.click(screen.getByLabelText("Деньги"));
+
+    expect(await screen.findByText("Финансовая позиция")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Деньги" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Июнь 2026 г." })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Пополнение" }));
+    expect(screen.getByRole("heading", { name: "Пополнение счета" })).toBeInTheDocument();
+    expect(await screen.findByLabelText("Способ оплаты")).toHaveValue("payment-method-1");
+    fireEvent.change(screen.getByLabelText("Способ оплаты"), {
+      target: {
+        value: "payment-method-2"
+      }
+    });
+    fireEvent.change(screen.getByLabelText("Сумма, ₽"), {
+      target: {
+        value: "250"
+      }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Пополнить" }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/v1/finance/operations",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            type: "DEPOSIT",
+            amountCents: 25_000,
+            paymentMethodId: "payment-method-2",
+            description: "Пополнение счета",
+            comment: undefined
+          })
+        })
+      );
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Списание" }));
+    expect(screen.getByRole("heading", { name: "Списание со счета" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Обновить деньги")).toBeInTheDocument();
   });
 
   it("lets a master update only working repair statuses from an order card", async () => {
@@ -378,6 +466,7 @@ describe("App", () => {
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(jsonResponse(authResponse))
       .mockResolvedValueOnce(jsonResponse(dashboardResponse))
+      .mockResolvedValueOnce(jsonResponse(financeOverviewResponse))
       .mockResolvedValueOnce(jsonResponse(mastersResponse))
       .mockResolvedValueOnce(jsonResponse(commissionsWithUnpaidResponse))
       .mockResolvedValueOnce(
@@ -399,7 +488,9 @@ describe("App", () => {
     render(<App />);
 
     await screen.findByLabelText("Заказы");
-    fireEvent.click(screen.getByLabelText("Выплаты"));
+    fireEvent.click(screen.getByLabelText("Деньги"));
+    expect(await screen.findByText("Финансовая позиция")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Выплаты мастерам" }));
     expect(await screen.findByRole("heading", { name: "Выплаты мастерам" })).toBeInTheDocument();
     const payoutTable = await screen.findByRole("table", { name: "Реестр комиссий" });
     expect(within(payoutTable).getByRole("columnheader", { name: "Заказ" })).toBeInTheDocument();
@@ -427,11 +518,150 @@ describe("App", () => {
     });
   });
 
-  it("creates general expenses from the register and order item expenses from the order card", async () => {
+  it("opens a separate money operations ledger from the overview", async () => {
+    window.sessionStorage.setItem("orchid_auth_session_v1", JSON.stringify(authResponse));
+    const ledgerOverviewResponse = {
+      ...financeOverviewResponse,
+      operations: [
+        financeOverviewResponse.operations[0],
+        {
+          id: "manual-1",
+          source: "MANUAL",
+          type: "WITHDRAWAL",
+          direction: "OUT",
+          amountCents: 25_000,
+          signedAmountCents: -25_000,
+          occurredAt: "2026-06-11T10:00:00.000Z",
+          description: "Списание на хозяйственные нужды",
+          paymentMethodId: "payment-method-2",
+          paymentMethodName: "Перевод",
+          counterpartyName: null,
+          repairOrderId: null,
+          repairOrderNumber: null,
+          createdByName: "Саша",
+          comment: null
+        }
+      ]
+    };
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse({}, { status: 401 }))
+      .mockResolvedValueOnce(jsonResponse(authResponse.user))
+      .mockResolvedValueOnce(jsonResponse(dashboardResponse))
+      .mockResolvedValueOnce(jsonResponse(ledgerOverviewResponse))
+      .mockResolvedValueOnce(jsonResponse(ledgerOverviewResponse));
+
+    render(<App />);
+
+    await screen.findByLabelText("Заказы");
+    fireEvent.click(screen.getByLabelText("Деньги"));
+    expect(await screen.findByText("Финансовая позиция")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Все операции" }));
+
+    expect(await screen.findByRole("heading", { name: "Журнал операций" })).toBeInTheDocument();
+    const operation = await screen.findByText("Оплата заказа № 00001");
+    expect(operation).toBeInTheDocument();
+    expect(screen.getByText("Списание на хозяйственные нужды")).toBeInTheDocument();
+    expect(screen.getByText(/Наличные · Петр · Саша/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Движение"), {
+      target: {
+        value: "OUT"
+      }
+    });
+    expect(screen.queryByText("Оплата заказа № 00001")).not.toBeInTheDocument();
+    expect(screen.getByText("Списание на хозяйственные нужды")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Способ оплаты"), {
+      target: {
+        value: "Наличные"
+      }
+    });
+    expect(screen.getByText("Нет операций под выбранные фильтры.")).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/money/ledger");
+  });
+
+  it("opens the finance audit trail from the money overview", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(jsonResponse(authResponse))
       .mockResolvedValueOnce(jsonResponse(dashboardResponse))
+      .mockResolvedValueOnce(jsonResponse(financeOverviewResponse))
+      .mockResolvedValueOnce(jsonResponse(auditLogResponse));
+
+    render(<App />);
+
+    await screen.findByLabelText("Заказы");
+    fireEvent.click(screen.getByLabelText("Деньги"));
+    expect(await screen.findByText("Финансовая позиция")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Финансовый журнал" }));
+
+    expect(await screen.findByRole("heading", { name: "Финансовый журнал" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/money/audit");
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/v1/audit?limit=50&scope=finance",
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: "Bearer access-token"
+          })
+        })
+      );
+    });
+  });
+
+  it("opens receivable orders from the finance overview", async () => {
+    const receivableOrder = {
+      ...repairOrdersResponse.items[0],
+      id: "repair-2",
+      orderNumber: "00002",
+      customerName: "Анна",
+      instrumentName: "Fender Telecaster",
+      paymentStatus: "PARTIALLY_PAID" as const,
+      totalAmountCents: 300_000,
+      paidAmountCents: 80_000,
+      balanceDueCents: 220_000
+    };
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse(authResponse))
+      .mockResolvedValueOnce(jsonResponse(dashboardResponse))
+      .mockResolvedValueOnce(jsonResponse(financeOverviewResponse))
+      .mockResolvedValueOnce(jsonResponse(financeOverviewResponse))
+      .mockResolvedValueOnce(jsonResponse(receivableOrder))
+      .mockResolvedValueOnce(jsonResponse(mastersResponse))
+      .mockResolvedValueOnce(jsonResponse(paymentMethodsResponse))
+      .mockResolvedValueOnce(jsonResponse(serviceCatalogResponse))
+      .mockResolvedValueOnce(jsonResponse(repairOrderAuditResponse));
+
+    render(<App />);
+
+    await screen.findByLabelText("Заказы");
+    await screen.findByText("Актуально");
+    fireEvent.click(screen.getByLabelText("Деньги"));
+    expect(await screen.findByText("Финансовая позиция")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Открыть дебиторку" }));
+
+    expect(await screen.findByRole("heading", { name: "Дебиторка" })).toBeInTheDocument();
+    expect(await screen.findByText("Fender Telecaster")).toBeInTheDocument();
+    expect(screen.getByText("Анна")).toBeInTheDocument();
+    expect(screen.getByText("№ 00002")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Открыть заказ № 00002" }));
+
+    expect(window.location.pathname).toBe("/orders/repair-2");
+    expect(await screen.findByRole("heading", { name: "№ 00002" })).toBeInTheDocument();
+  });
+
+  it("creates general expenses from the register and order item expenses from the order card", async () => {
+    window.history.replaceState(null, "", "/");
+
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse(authResponse))
+      .mockResolvedValueOnce(jsonResponse(dashboardResponse))
+      .mockResolvedValueOnce(jsonResponse(financeOverviewResponse))
       .mockResolvedValueOnce(jsonResponse(expensesResponse))
       .mockResolvedValueOnce(jsonResponse(expenseCategoriesResponse))
       .mockResolvedValueOnce(jsonResponse(paymentMethodsResponse))
@@ -456,9 +686,26 @@ describe("App", () => {
     render(<App />);
 
     await screen.findByLabelText("Заказы");
-    fireEvent.click(screen.getByLabelText("Расходы"));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/v1/analytics/dashboard?month=2026-06",
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: "Bearer access-token"
+          })
+        })
+      );
+    });
+    fireEvent.click(screen.getByLabelText("Деньги"));
+    expect(await screen.findByText("Финансовая позиция")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Расходы" }));
     await screen.findByRole("heading", { name: "Расходы" });
     fireEvent.click(screen.getByRole("button", { name: "Новый расход" }));
+    expect(window.location.pathname).toBe("/money/expenses/new");
+    expect(screen.getByLabelText("Деньги")).toHaveAttribute("aria-current", "page");
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Добавить расход" })).not.toBeDisabled();
+    });
 
     fireEvent.click(await screen.findByRole("checkbox", { name: /Общий расход/ }));
     fireEvent.change(await screen.findByLabelText("Описание"), {
@@ -489,6 +736,8 @@ describe("App", () => {
         })
       );
     });
+    expect(await screen.findByRole("heading", { name: "Расходы" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/money/expenses");
 
     fireEvent.click(await screen.findByLabelText("Заказы"));
     await screen.findByText("Fender Stratocaster");

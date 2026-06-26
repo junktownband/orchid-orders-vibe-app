@@ -2,13 +2,37 @@ import { ExpenseKind, ExpenseStatus, prisma } from "@orchid/db";
 
 import { recalculateIssuedOrderCommissionsTx } from "../repair-orders/repository.js";
 
-export async function listExpenses(organizationId: string) {
+export type ExpenseListOptions = {
+  from?: Date;
+  to?: Date;
+  createdByUserId?: string;
+  status?: ExpenseStatus;
+  limit: number;
+};
+
+export async function listExpenses(organizationId: string, options: ExpenseListOptions) {
   return prisma.expense.findMany({
     where: {
-      organizationId
+      organizationId,
+      createdByUserId: options.createdByUserId || undefined,
+      status: options.status,
+      spentAt:
+        options.from || options.to
+          ? {
+              gte: options.from,
+              lte: options.to
+            }
+          : undefined
     },
     include: {
       category: true,
+      createdBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true
+        }
+      },
       paymentMethod: true,
       repairOrder: {
         select: {
@@ -26,8 +50,47 @@ export async function listExpenses(organizationId: string) {
     orderBy: {
       spentAt: "desc"
     },
-    take: 50
+    take: options.limit
   });
+}
+
+export async function listExpenseAuthors(organizationId: string, range?: { from?: Date; to?: Date }) {
+  const expenses = await prisma.expense.findMany({
+    where: {
+      organizationId,
+      createdByUserId: {
+        not: null
+      },
+      spentAt:
+        range?.from || range?.to
+          ? {
+              gte: range.from,
+              lte: range.to
+            }
+          : undefined
+    },
+    distinct: ["createdByUserId"],
+    select: {
+      createdBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true
+        }
+      }
+    },
+    orderBy: {
+      createdByUserId: "asc"
+    }
+  });
+
+  return expenses
+    .map((expense) => expense.createdBy)
+    .filter((author): author is { id: string; name: string; email: string } => Boolean(author))
+    .map((author) => ({
+      id: author.id,
+      name: author.name ?? author.email
+    }));
 }
 
 export async function findExpenseRepairOrder(organizationId: string, id: string) {
@@ -88,6 +151,13 @@ export async function createExpense(
     },
     include: {
       category: true,
+      createdBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true
+        }
+      },
       paymentMethod: true,
       repairOrder: {
         select: {
@@ -118,6 +188,13 @@ export async function confirmExpense(organizationId: string, id: string) {
       },
       include: {
         category: true,
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
         paymentMethod: true,
         repairOrder: {
           select: {
@@ -151,6 +228,13 @@ export async function voidExpense(organizationId: string, id: string, reason: st
       },
       include: {
         category: true,
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
         paymentMethod: true,
         repairOrder: {
           select: {
@@ -191,6 +275,13 @@ export async function voidExpense(organizationId: string, id: string, reason: st
       },
       include: {
         category: true,
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
         paymentMethod: true,
         repairOrder: {
           select: {

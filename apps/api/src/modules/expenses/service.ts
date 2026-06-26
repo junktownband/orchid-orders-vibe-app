@@ -2,6 +2,7 @@ import {
   apiErrorCodes,
   type CreateExpenseInput,
   type ExpenseListResponse,
+  type ExpenseQuery,
   type ExpenseResponse,
   type VoidExpenseInput
 } from "@orchid/shared";
@@ -13,12 +14,14 @@ import {
   createExpense,
   findExpenseRepairOrder,
   findExpenseRepairOrderItem,
+  listExpenseAuthors,
   listExpenses,
   voidExpense
 } from "./repository.js";
 import { assertActiveExpenseCategory, assertActivePaymentMethod } from "../settings/service.js";
 
 type ExpenseRecord = Awaited<ReturnType<typeof listExpenses>>[number];
+type ExpenseListQuery = Partial<ExpenseQuery>;
 
 function assertCanManageExpenses(auth: AuthContext) {
   if (!["OWNER", "ADMIN", "MANAGER"].includes(auth.role)) {
@@ -32,6 +35,8 @@ function toResponse(expense: ExpenseRecord): ExpenseResponse {
     amountCents: expense.amountCents,
     spentAt: expense.spentAt.toISOString(),
     spentByName: expense.spentByName,
+    createdByUserId: expense.createdByUserId,
+    createdByName: expense.createdBy?.name ?? expense.createdBy?.email ?? null,
     description: expense.description,
     kind: expense.kind,
     status: expense.status,
@@ -48,6 +53,13 @@ function toResponse(expense: ExpenseRecord): ExpenseResponse {
     voidReason: expense.voidReason,
     createdAt: expense.createdAt.toISOString(),
     updatedAt: expense.updatedAt.toISOString()
+  };
+}
+
+function utcDateOnlyRange(query: ExpenseListQuery) {
+  return {
+    from: query.from ? new Date(`${query.from}T00:00:00.000Z`) : undefined,
+    to: query.to ? new Date(`${query.to}T23:59:59.999Z`) : undefined
   };
 }
 
@@ -83,13 +95,23 @@ async function normalizeLinks(auth: AuthContext, input: CreateExpenseInput) {
   };
 }
 
-export async function getExpenses(auth: AuthContext): Promise<ExpenseListResponse> {
+export async function getExpenses(auth: AuthContext, query: ExpenseListQuery = {}): Promise<ExpenseListResponse> {
   assertCanManageExpenses(auth);
 
-  const expenses = await listExpenses(auth.organizationId);
+  const range = utcDateOnlyRange(query);
+  const [expenses, authors] = await Promise.all([
+    listExpenses(auth.organizationId, {
+      ...range,
+      createdByUserId: query.createdByUserId,
+      status: query.status,
+      limit: query.limit ?? 120
+    }),
+    listExpenseAuthors(auth.organizationId, range)
+  ]);
 
   return {
-    items: expenses.map(toResponse)
+    items: expenses.map(toResponse),
+    authors
   };
 }
 

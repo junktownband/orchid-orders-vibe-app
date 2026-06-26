@@ -9,6 +9,7 @@ import {
 import { writeAuditLog } from "../audit/service.js";
 import { AuthError, type AuthContext } from "../auth/service.js";
 import { monthPeriod } from "../analytics/service.js";
+import { assertActivePaymentMethod } from "../settings/service.js";
 import { createManualFinanceOperation, getFinanceData } from "./repository.js";
 
 type FinanceOperationRecord = Awaited<ReturnType<typeof getFinanceData>>["operations"][number];
@@ -48,6 +49,8 @@ function toOperationResponse(operation: FinanceOperationRecord): FinanceOperatio
     signedAmountCents: operation.amountCents * operationDirectionSign(operation.direction),
     occurredAt: operation.occurredAt.toISOString(),
     description: operation.description,
+    paymentMethodId: operation.paymentMethodId,
+    paymentMethodName: operation.paymentMethodName,
     counterpartyName: operation.counterpartyName,
     repairOrderId: operation.repairOrderId,
     repairOrderNumber: operation.repairOrderNumber,
@@ -68,6 +71,8 @@ function manualOperationToResponse(operation: ManualFinanceOperationRecord): Fin
     signedAmountCents: operation.amountCents * operationDirectionSign(direction),
     occurredAt: operation.occurredAt.toISOString(),
     description: operation.description,
+    paymentMethodId: operation.paymentMethod?.id ?? null,
+    paymentMethodName: operation.paymentMethod?.name ?? null,
     counterpartyName: null,
     repairOrderId: null,
     repairOrderNumber: null,
@@ -116,9 +121,18 @@ export async function getFinanceOverview(
         data.manualOutflowCents,
       repairOrdersCount: data.repairOrdersCount,
       paidOrdersCount: data.paidOrdersCount,
+      unpaidOrdersCount: data.unpaidOrdersCount,
+      partiallyPaidOrdersCount: data.partiallyPaidOrdersCount,
+      receivablesCents: data.receivablesCents,
       averagePaidTicketCents: data.averagePaidTicketCents
     },
+    analytics: data.analytics,
     masterCommissions: data.masterCommissions,
+    receivableOrders: data.receivableOrders.map((order) => ({
+      ...order,
+      createdAt: order.createdAt.toISOString(),
+      updatedAt: order.updatedAt.toISOString()
+    })),
     operations: data.operations.map(toOperationResponse)
   };
 }
@@ -129,6 +143,7 @@ export async function addFinanceOperation(
 ): Promise<FinanceOperationResponse> {
   assertCanManageFinance(auth);
 
+  await assertActivePaymentMethod(auth.organizationId, input.paymentMethodId);
   const operation = await createManualFinanceOperation(auth.organizationId, auth.userId, input);
   const response = manualOperationToResponse(operation);
 
