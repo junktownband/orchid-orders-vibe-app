@@ -372,7 +372,9 @@ describe("App", () => {
 
     expect(await screen.findByText("Финансовая позиция")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Деньги" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Июнь 2026 г." })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Июнь 2026" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Июнь 2026 г." })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Обновить деньги")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Пополнение" }));
     expect(screen.getByRole("heading", { name: "Пополнение счета" })).toBeInTheDocument();
     expect(await screen.findByLabelText("Способ оплаты")).toHaveValue("payment-method-1");
@@ -404,7 +406,6 @@ describe("App", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Списание" }));
     expect(screen.getByRole("heading", { name: "Списание со счета" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Обновить деньги")).toBeInTheDocument();
   });
 
   it("lets a master update only working repair statuses from an order card", async () => {

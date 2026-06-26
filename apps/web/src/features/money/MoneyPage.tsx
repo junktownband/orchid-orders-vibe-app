@@ -9,7 +9,6 @@ import {
   Landmark,
   PieChart,
   ReceiptText,
-  RotateCcw,
   Scale,
   TrendingUp,
   Users,
@@ -79,7 +78,9 @@ function monthLabel(value: string) {
     year: "numeric"
   }).format(new Date(year, month - 1, 1));
 
-  return label.replace(/^./u, (letter) => letter.toLocaleUpperCase("ru-RU"));
+  return label
+    .replace(/\s?г\.$/u, "")
+    .replace(/^./u, (letter) => letter.toLocaleUpperCase("ru-RU"));
 }
 
 function pluralRu(count: number, one: string, few: string, many: string) {
@@ -362,6 +363,22 @@ export function MoneyPage({
     void refresh(month);
   }, [accessToken, month]);
 
+  useEffect(() => {
+    function refreshOnReturn() {
+      if (document.visibilityState !== "hidden") {
+        void refresh(month);
+      }
+    }
+
+    window.addEventListener("focus", refreshOnReturn);
+    document.addEventListener("visibilitychange", refreshOnReturn);
+
+    return () => {
+      window.removeEventListener("focus", refreshOnReturn);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
+    };
+  }, [accessToken, month]);
+
   function updateMonth(nextMonth: string) {
     setMonth(nextMonth);
     window.history.replaceState(null, "", nextMonth === currentMonthValue() ? "/money" : `/money?month=${nextMonth}`);
@@ -518,34 +535,31 @@ export function MoneyPage({
 
   return (
     <div className="grid gap-4">
-      <section className="relative grid gap-4 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
-        <div aria-hidden="true" className="hidden lg:block" />
-        <div className="mx-auto grid w-full max-w-md grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2">
-          <GhostButton aria-label="Предыдущий месяц" className="h-11 w-11 px-0" onClick={() => updateMonth(shiftMonth(month, -1))}>
-            <ChevronLeft aria-hidden="true" size={18} />
-          </GhostButton>
+      <section className="flex justify-center">
+        <div className="grid w-full max-w-md grid-cols-[48px_minmax(0,1fr)_48px] items-center gap-2">
           <button
-            className="min-w-0 rounded-lg border border-white/[0.08] bg-white/[0.055] px-4 py-3 text-center text-lg font-semibold tracking-normal text-white shadow-inner-glass transition-colors hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30"
+            aria-label="Предыдущий месяц"
+            className="grid h-12 w-12 touch-manipulation place-items-center rounded-full text-white/62 transition-[background,color,transform] hover:bg-white/[0.055] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30 active:translate-y-px"
+            onClick={() => updateMonth(shiftMonth(month, -1))}
+            type="button"
+          >
+            <ChevronLeft aria-hidden="true" size={26} strokeWidth={1.9} />
+          </button>
+          <button
+            className="min-w-0 rounded-lg px-3 py-3 text-center text-xl font-semibold tracking-normal text-white transition-colors hover:bg-white/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30"
             onClick={() => updateMonth(currentMonthValue())}
             type="button"
           >
             {monthLabel(month)}
           </button>
-          <GhostButton aria-label="Следующий месяц" className="h-11 w-11 px-0" onClick={() => updateMonth(shiftMonth(month, 1))}>
-            <ChevronRight aria-hidden="true" size={18} />
-          </GhostButton>
-        </div>
-
-        <div className="h-10">
-          <GhostButton
-            aria-label="Обновить деньги"
-            className="absolute right-0 top-0 h-10 w-10 px-0"
-            disabled={isLoading}
-            onClick={() => void refresh()}
+          <button
+            aria-label="Следующий месяц"
+            className="grid h-12 w-12 touch-manipulation place-items-center rounded-full text-white/62 transition-[background,color,transform] hover:bg-white/[0.055] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30 active:translate-y-px"
+            onClick={() => updateMonth(shiftMonth(month, 1))}
             type="button"
           >
-            <RotateCcw aria-hidden="true" size={16} />
-          </GhostButton>
+            <ChevronRight aria-hidden="true" size={26} strokeWidth={1.9} />
+          </button>
         </div>
       </section>
 

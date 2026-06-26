@@ -77,7 +77,9 @@ function monthLabel(value: string) {
     year: "numeric"
   }).format(new Date(year, month - 1, 1));
 
-  return label.replace(/^./u, (letter) => letter.toLocaleUpperCase("ru-RU"));
+  return label
+    .replace(/\s?г\.$/u, "")
+    .replace(/^./u, (letter) => letter.toLocaleUpperCase("ru-RU"));
 }
 
 function dateRangeForMonth(value: string) {
