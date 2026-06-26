@@ -213,6 +213,14 @@ export async function setExpenseVoided(
       throw new AuthError(apiErrorCodes.businessRuleViolation, error.message, 422);
     }
 
+    if (error instanceof Error && error.message === "Adjusted order total is below paid amount") {
+      throw new AuthError(
+        apiErrorCodes.businessRuleViolation,
+        "Expense cannot be voided while order payments exceed the adjusted total",
+        422
+      );
+    }
+
     throw new AuthError(apiErrorCodes.notFound, "Expense not found", 404);
   }
 }

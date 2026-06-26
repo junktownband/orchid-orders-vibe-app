@@ -1,4 +1,4 @@
-import { ExpenseKind, ExpenseStatus, prisma } from "@orchid/db";
+import { ExpenseKind, ExpenseStatus, PaymentStatus, Prisma, prisma } from "@orchid/db";
 
 import { recalculateIssuedOrderCommissionsTx } from "../repair-orders/repository.js";
 
@@ -9,6 +9,125 @@ export type ExpenseListOptions = {
   status?: ExpenseStatus;
   limit: number;
 };
+
+type ExpenseTransaction = Prisma.TransactionClient;
+
+const expenseInclude = {
+  category: true,
+  createdBy: {
+    select: {
+      id: true,
+      name: true,
+      email: true
+    }
+  },
+  paymentMethod: true,
+  repairOrder: {
+    select: {
+      id: true,
+      orderNumber: true
+    }
+  },
+  repairOrderItem: {
+    select: {
+      id: true,
+      nameSnapshot: true
+    }
+  }
+} as const;
+
+function paymentStatusFromPaidAmount(totalAmountCents: number, paidAmountCents: number): PaymentStatus {
+  if (paidAmountCents > totalAmountCents) {
+    throw new Error("Adjusted order total is below paid amount");
+  }
+
+  if (paidAmountCents <= 0) {
+    return PaymentStatus.UNPAID;
+  }
+
+  if (paidAmountCents < totalAmountCents) {
+    return PaymentStatus.PARTIALLY_PAID;
+  }
+
+  return PaymentStatus.PAID;
+}
+
+async function applyItemExpenseChargeTx(
+  tx: ExpenseTransaction,
+  organizationId: string,
+  expense: {
+    amountCents: number;
+    kind: ExpenseKind;
+    repairOrderId: string | null;
+    repairOrderItemId: string | null;
+  },
+  direction: 1 | -1
+) {
+  if (expense.kind !== ExpenseKind.REGULAR || !expense.repairOrderId || !expense.repairOrderItemId) {
+    return;
+  }
+
+  const order = await tx.repairOrder.findFirst({
+    where: {
+      id: expense.repairOrderId,
+      organizationId,
+      deletedAt: null
+    },
+    select: {
+      id: true,
+      totalAmountCents: true,
+      taxRateBps: true,
+      taxAmountCents: true,
+      payments: {
+        where: {
+          isVoided: false
+        },
+        select: {
+          amountCents: true
+        }
+      }
+    }
+  });
+
+  if (!order) {
+    return;
+  }
+
+  const deltaCents = expense.amountCents * direction;
+  const nextTotalAmountCents = order.totalAmountCents + deltaCents;
+  const paidAmountCents = order.payments.reduce((sum, payment) => sum + payment.amountCents, 0);
+  const taxAmountCents = order.taxRateBps
+    ? Math.round((nextTotalAmountCents * order.taxRateBps) / 10000)
+    : order.taxAmountCents;
+
+  await tx.repairOrderItem.update({
+    where: {
+      id: expense.repairOrderItemId
+    },
+    data: {
+      priceCents: {
+        increment: deltaCents
+      }
+    }
+  });
+
+  await tx.repairOrder.update({
+    where: {
+      id: order.id,
+      organizationId
+    },
+    data: {
+      totalAmountCents: {
+        increment: deltaCents
+      },
+      grossProfitCents: {
+        increment: deltaCents
+      },
+      paymentStatus: paymentStatusFromPaidAmount(nextTotalAmountCents, paidAmountCents),
+      taxAmountCents
+    }
+  });
+}
 
 export async function listExpenses(organizationId: string, options: ExpenseListOptions) {
   return prisma.expense.findMany({
@@ -177,6 +296,22 @@ export async function createExpense(
 
 export async function confirmExpense(organizationId: string, id: string) {
   return prisma.$transaction(async (tx) => {
+    const existing = await tx.expense.findFirst({
+      where: {
+        id,
+        organizationId
+      },
+      include: expenseInclude
+    });
+
+    if (!existing) {
+      throw new Error("Expense not found");
+    }
+
+    if (existing.status === ExpenseStatus.CONFIRMED) {
+      return existing;
+    }
+
     const expense = await tx.expense.update({
       where: {
         id,
@@ -186,32 +321,11 @@ export async function confirmExpense(organizationId: string, id: string) {
         status: ExpenseStatus.CONFIRMED,
         confirmedAt: new Date()
       },
-      include: {
-        category: true,
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        },
-        paymentMethod: true,
-        repairOrder: {
-          select: {
-            id: true,
-            orderNumber: true
-          }
-        },
-        repairOrderItem: {
-          select: {
-            id: true,
-            nameSnapshot: true
-          }
-        }
-      }
+      include: expenseInclude
     });
 
     if (expense.kind === ExpenseKind.REGULAR && expense.repairOrderId && expense.repairOrderItemId) {
+      await applyItemExpenseChargeTx(tx, organizationId, expense, 1);
       await recalculateIssuedOrderCommissionsTx(tx, organizationId, expense.repairOrderId);
     }
 
@@ -226,29 +340,7 @@ export async function voidExpense(organizationId: string, id: string, reason: st
         id,
         organizationId
       },
-      include: {
-        category: true,
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        },
-        paymentMethod: true,
-        repairOrder: {
-          select: {
-            id: true,
-            orderNumber: true
-          }
-        },
-        repairOrderItem: {
-          select: {
-            id: true,
-            nameSnapshot: true
-          }
-        }
-      }
+      include: expenseInclude
     });
 
     if (!existing) {
@@ -273,29 +365,7 @@ export async function voidExpense(organizationId: string, id: string, reason: st
         voidedAt: new Date(),
         voidReason: reason
       },
-      include: {
-        category: true,
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        },
-        paymentMethod: true,
-        repairOrder: {
-          select: {
-            id: true,
-            orderNumber: true
-          }
-        },
-        repairOrderItem: {
-          select: {
-            id: true,
-            nameSnapshot: true
-          }
-        }
-      }
+      include: expenseInclude
     });
 
     if (
@@ -303,6 +373,7 @@ export async function voidExpense(organizationId: string, id: string, reason: st
       existing.repairOrderId &&
       existing.repairOrderItemId
     ) {
+      await applyItemExpenseChargeTx(tx, organizationId, existing, -1);
       await recalculateIssuedOrderCommissionsTx(tx, organizationId, existing.repairOrderId);
     }
 

@@ -292,10 +292,9 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: /Журнал/ }));
     expect(await screen.findByRole("heading", { name: "Журнал" })).toBeInTheDocument();
     const auditEvent = await screen.findByRole("article");
-    expect(within(auditEvent).getByText("Статус заказа")).toBeInTheDocument();
-    expect(
-      within(auditEvent).getByText(/Repair order status changed to READY/)
-    ).toBeInTheDocument();
+    expect(within(auditEvent).getByText("Статус заказа изменен")).toBeInTheDocument();
+    expect(within(auditEvent).getByText("Готов")).toBeInTheDocument();
+    expect(within(auditEvent).queryByText(/Repair order status changed to READY/)).not.toBeInTheDocument();
     expectNoMojibake(baseElement);
     fireEvent.click(screen.getByLabelText("Назад"));
     expect(await screen.findByRole("heading", { name: "Настройки" })).toBeInTheDocument();
@@ -559,9 +558,9 @@ describe("App", () => {
     fireEvent.click(screen.getByLabelText("Деньги"));
     expect(await screen.findByText("Финансовая позиция")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Все операции" }));
+    fireEvent.click(screen.getByRole("button", { name: "Движение денег" }));
 
-    expect(await screen.findByRole("heading", { name: "Журнал операций" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Движение денег" })).toBeInTheDocument();
     const operation = await screen.findByText("Оплата заказа № 00001");
     expect(operation).toBeInTheDocument();
     expect(screen.getByText("Списание на хозяйственные нужды")).toBeInTheDocument();
@@ -596,9 +595,9 @@ describe("App", () => {
     fireEvent.click(screen.getByLabelText("Деньги"));
     expect(await screen.findByText("Финансовая позиция")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Финансовый журнал" }));
+    fireEvent.click(screen.getByRole("button", { name: "История изменений" }));
 
-    expect(await screen.findByRole("heading", { name: "Финансовый журнал" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "История изменений" })).toBeInTheDocument();
     expect(window.location.pathname).toBe("/money/audit");
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(

@@ -144,7 +144,7 @@ export function MoneyLedgerPage({
         }
         back={() => navigate({ section: "money", view: "overview", month })}
         count={filteredOperations.length}
-        title="Журнал операций"
+        title="Движение денег"
       />
 
       <GlassPanel className="mb-4 p-4">

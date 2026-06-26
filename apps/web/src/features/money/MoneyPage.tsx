@@ -581,7 +581,7 @@ export function MoneyPage({
               </GhostButton>
               <GhostButton onClick={() => navigate({ section: "money", view: "ledger", month })}>
                 <History aria-hidden="true" size={17} />
-                Все операции
+                Движение денег
               </GhostButton>
             </div>
           </div>
@@ -651,7 +651,7 @@ export function MoneyPage({
               <StatHeader icon={Landmark} label="Счет мастерской" title="Финансовая позиция" />
               <GhostButton onClick={() => navigate({ section: "money", view: "audit" })}>
                 <History aria-hidden="true" size={17} />
-                Финансовый журнал
+                История изменений
               </GhostButton>
             </div>
             <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 xl:grid-cols-4">

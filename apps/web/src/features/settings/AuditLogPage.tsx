@@ -6,6 +6,7 @@ import {
   auditActionLabel,
   auditActionTone,
   auditDetails,
+  auditEventTitle,
   auditEntityLabel,
   authHeaders,
   dateTime,
@@ -136,7 +137,7 @@ export function AuditLogPage({
   const availableEntityTypeOptions = isMoneyMode ? financeEntityTypeOptions : entityTypeOptions;
   const scope = isMoneyMode ? "finance" : undefined;
   const basePath = isMoneyMode ? "/money/audit" : "/settings/audit";
-  const title = isMoneyMode ? "Финансовый журнал" : "Журнал";
+  const title = isMoneyMode ? "История изменений" : "Журнал";
   const backScreen: Screen = isMoneyMode
     ? { section: "money", view: "overview" }
     : { section: "settings", view: "profile" };
@@ -254,7 +255,7 @@ export function AuditLogPage({
           </GlassPanel>
         ) : null}
         {items.map((item) => {
-          const details = auditDetails(item.afterJson ?? item.beforeJson);
+          const details = auditDetails(item);
 
           return (
             <GlassPanel key={item.id} as="article" className="p-4">
@@ -264,19 +265,23 @@ export function AuditLogPage({
                     <StatusPill label={auditActionLabel(item.action)} tone={auditActionTone(item.action)} />
                     <span className="text-sm text-white/45">{dateTime(item.createdAt)}</span>
                   </div>
-                  <h3 className="mt-3 text-lg font-semibold">
-                    {auditEntityLabel(item.entityType)} · {shortId(item.entityId)}
-                  </h3>
+                  <h3 className="mt-3 text-lg font-semibold">{auditEventTitle(item)}</h3>
                   <p className="mt-1 text-sm text-white/55">
                     {item.userName ? `Автор: ${item.userName}` : "Системное событие"}
-                    {item.comment ? ` · ${item.comment}` : ""}
+                    {" · "}
+                    {auditEntityLabel(item.entityType)} · {shortId(item.entityId)}
                   </p>
                 </div>
               </div>
-              {details ? (
-                <pre className="mt-3 max-h-44 overflow-auto rounded-md bg-black/20 p-3 text-xs leading-5 text-white/58 ring-1 ring-white/[0.08]">
-                  {details}
-                </pre>
+              {details.length > 0 ? (
+                <dl className="mt-4 grid gap-2 rounded-lg bg-white/[0.035] p-3 ring-1 ring-white/[0.07] sm:grid-cols-2">
+                  {details.map((detail) => (
+                    <div key={`${detail.label}-${detail.value}`} className="min-w-0">
+                      <dt className="text-xs uppercase text-white/36">{detail.label}</dt>
+                      <dd className="mt-1 break-words text-sm font-medium text-white/72">{detail.value}</dd>
+                    </div>
+                  ))}
+                </dl>
               ) : null}
             </GlassPanel>
           );

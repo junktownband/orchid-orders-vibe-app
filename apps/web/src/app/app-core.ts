@@ -1046,12 +1046,217 @@ export function auditEntityLabel(entityType: string) {
   return entityType;
 }
 
-export function auditDetails(value: unknown) {
-  if (!value || typeof value !== "object") {
+type AuditDetailRow = {
+  label: string;
+  value: string;
+};
+
+const auditFieldLabels: Record<string, string> = {
+  amountCents: "Сумма",
+  commissionAmountCents: "Комиссия",
+  commissionBaseCents: "База комиссии",
+  description: "Описание",
+  finalAmountCents: "Итого к оплате",
+  paidAmountCents: "Оплачено",
+  paymentMethodId: "Способ оплаты",
+  paymentMethodName: "Способ оплаты",
+  paymentStatus: "Оплата",
+  reason: "Причина",
+  repairOrderId: "Заказ",
+  repairOrderItemId: "Позиция",
+  repairOrderItemName: "Позиция",
+  repairOrderNumber: "Заказ",
+  repairStatus: "Статус заказа",
+  status: "Статус",
+  taxAmountCents: "Налог",
+  totalAmountCents: "Сумма заказа",
+  totalCostCents: "Себестоимость",
+  voidReason: "Причина отмены"
+};
+
+const moneyAuditFields = new Set([
+  "amountCents",
+  "commissionAmountCents",
+  "commissionBaseCents",
+  "finalAmountCents",
+  "paidAmountCents",
+  "taxAmountCents",
+  "totalAmountCents",
+  "totalCostCents"
+]);
+
+function auditValueObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function auditText(value: unknown) {
+  if (value === null || value === undefined || value === "") {
     return "";
   }
 
-  return JSON.stringify(value, null, 2);
+  if (typeof value === "number") {
+    return String(value);
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Да" : "Нет";
+  }
+
+  return String(value);
+}
+
+function auditStatusText(key: string, value: unknown) {
+  if (key === "repairStatus") {
+    return repairStatusLabel(value as RepairOrderResponse["repairStatus"]);
+  }
+
+  if (key === "paymentStatus") {
+    return paymentStatusLabel(value as RepairOrderResponse["paymentStatus"]);
+  }
+
+  if (key === "status") {
+    if (value === "DRAFT") {
+      return "Черновик";
+    }
+
+    if (value === "CONFIRMED") {
+      return "Подтвержден";
+    }
+
+    if (value === "VOIDED") {
+      return "Отменен";
+    }
+  }
+
+  if (key === "commissionPayoutStatus") {
+    return value === "PAID" ? "Выплачено" : "К выплате";
+  }
+
+  return auditText(value);
+}
+
+function auditFieldValue(key: string, value: unknown) {
+  if (moneyAuditFields.has(key) && typeof value === "number") {
+    return money(value);
+  }
+
+  if (key === "repairOrderNumber") {
+    return `№ ${auditText(value)}`;
+  }
+
+  return auditStatusText(key, value);
+}
+
+function pushAuditRow(rows: AuditDetailRow[], record: Record<string, unknown>, key: string) {
+  const label = auditFieldLabels[key] ?? key;
+  const value = auditFieldValue(key, record[key]);
+
+  if (value) {
+    rows.push({ label, value });
+  }
+}
+
+export function auditEventTitle(item: AuditLogResponse) {
+  if (item.entityType === "Expense") {
+    if (item.action === "CREATE") {
+      return "Расход создан";
+    }
+
+    if (item.action === "CONFIRM") {
+      return "Расход подтвержден";
+    }
+
+    if (item.action === "VOID") {
+      return "Расход отменен";
+    }
+  }
+
+  if (item.entityType === "FinanceOperation") {
+    const record = auditValueObject(item.afterJson ?? item.beforeJson);
+
+    if (record.type === "DEPOSIT") {
+      return "Пополнение счета";
+    }
+
+    if (record.type === "WITHDRAWAL") {
+      return "Списание со счета";
+    }
+
+    return "Ручная операция создана";
+  }
+
+  if (item.entityType === "RepairOrder") {
+    if (item.action === "PAYMENT_ADDED") {
+      return "Оплата добавлена";
+    }
+
+    if (item.action === "PAYMENT_VOIDED") {
+      return "Оплата отменена";
+    }
+
+    if (item.action === "ISSUE") {
+      return "Заказ выдан";
+    }
+
+    if (item.action === "STATUS_CHANGE") {
+      return "Статус заказа изменен";
+    }
+
+    if (item.action === "CREATE") {
+      return "Заказ создан";
+    }
+
+    if (item.action === "UPDATE") {
+      return "Заказ изменен";
+    }
+  }
+
+  if (item.entityType === "RepairOrderItem" && item.action === "COMMISSION_PAID") {
+    return "Комиссия мастеру выплачена";
+  }
+
+  return `${auditEntityLabel(item.entityType)}: ${auditActionLabel(item.action).toLocaleLowerCase("ru-RU")}`;
+}
+
+export function auditDetails(item: AuditLogResponse): AuditDetailRow[] {
+  const record = auditValueObject(item.afterJson ?? item.beforeJson);
+  const rows: AuditDetailRow[] = [];
+  const priorityKeys = [
+    "amountCents",
+    "finalAmountCents",
+    "paidAmountCents",
+    "commissionAmountCents",
+    "commissionBaseCents",
+    "totalAmountCents",
+    "totalCostCents",
+    "taxAmountCents",
+    "repairOrderNumber",
+    "repairOrderId",
+    "repairOrderItemName",
+    "repairOrderItemId",
+    "paymentMethodName",
+    "paymentMethodId",
+    "repairStatus",
+    "paymentStatus",
+    "status",
+    "voidReason",
+    "reason",
+    "description"
+  ];
+
+  for (const key of priorityKeys) {
+    if (Object.prototype.hasOwnProperty.call(record, key)) {
+      pushAuditRow(rows, record, key);
+    }
+  }
+
+  for (const key of Object.keys(record)) {
+    if (!priorityKeys.includes(key) && !key.endsWith("At") && !key.endsWith("UserId")) {
+      pushAuditRow(rows, record, key);
+    }
+  }
+
+  return rows;
 }
 
 export function auditActionTone(action: AuditLogResponse["action"]): AppTone {

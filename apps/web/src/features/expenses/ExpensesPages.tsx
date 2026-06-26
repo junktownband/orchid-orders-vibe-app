@@ -657,7 +657,7 @@ export function ExpensesListPage({
             </div>
             {expenseToConfirm.repairOrderItemName ? (
               <p className="rounded-lg bg-amber/10 p-3 text-amber ring-1 ring-amber/20">
-                Если это расходник услуги, невыплаченная комиссия мастера по этой услуге может пересчитаться.
+                Расходник увеличит сумму заказа для клиента. Комиссия мастера считается после себестоимости.
               </p>
             ) : null}
           </div>
@@ -997,8 +997,8 @@ export function ExpenseCreatePage({
                       ))}
                     </SelectField>
                     <p className="rounded-lg bg-amber/10 p-3 text-sm leading-6 text-amber ring-1 ring-amber/20">
-                      Чтобы расходник уменьшил комиссию мастера, выбери конкретную услугу. Расход на заказ целиком пока
-                      не распределяется между мастерами.
+                      Расходник по конкретной услуге увеличит сумму заказа для клиента. Комиссия мастера считается
+                      после себестоимости.
                     </p>
                   </>
                 ) : (
@@ -1082,8 +1082,8 @@ export function ExpenseCreatePage({
                   ))}
                 </SelectField>
                 <p className="rounded-lg bg-amber/10 p-3 text-sm leading-6 text-amber ring-1 ring-amber/20">
-                  Чтобы расходник уменьшил комиссию мастера, выбери конкретную услугу. Расход на заказ целиком пока не
-                  распределяется между мастерами.
+                  Расходник по конкретной услуге увеличит сумму заказа для клиента. Комиссия мастера считается после
+                  себестоимости.
                 </p>
               </div>
             ) : null}
