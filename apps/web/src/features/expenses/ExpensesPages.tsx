@@ -44,6 +44,14 @@ type ExpenseFilters = {
   status: ExpenseResponse["status"] | "";
 };
 
+type ExpenseScope = "business" | "commissions" | "all";
+
+const expenseScopeOptions: Array<{ value: ExpenseScope; label: string; detail: string }> = [
+  { value: "business", label: "Расходы бизнеса", detail: "Без выплат мастерам" },
+  { value: "commissions", label: "Комиссии мастерам", detail: "Только выплаты" },
+  { value: "all", label: "Все", detail: "Расходы и комиссии" }
+];
+
 function currentMonthValue(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
@@ -82,6 +90,12 @@ function monthFromSearch(search: string) {
   return month && /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? month : null;
 }
 
+function expenseScopeFromSearch(search: string): ExpenseScope {
+  const scope = new URLSearchParams(search).get("scope");
+
+  return scope === "commissions" || scope === "all" ? scope : "business";
+}
+
 function defaultExpenseFilters(month?: string | null): ExpenseFilters {
   return {
     ...(month ? dateRangeForMonth(month) : recentDateRange(60)),
@@ -103,7 +117,7 @@ function expenseFiltersFromSearch(search: string): ExpenseFilters {
   };
 }
 
-function searchForExpenseFilters(filters: ExpenseFilters, month?: string | null) {
+function searchForExpenseFilters(filters: ExpenseFilters, month?: string | null, scope: ExpenseScope = "business") {
   const params = new URLSearchParams();
   const monthRange = month ? dateRangeForMonth(month) : null;
 
@@ -127,13 +141,17 @@ function searchForExpenseFilters(filters: ExpenseFilters, month?: string | null)
     params.set("status", filters.status);
   }
 
+  if (scope !== "business") {
+    params.set("scope", scope);
+  }
+
   const search = params.toString();
 
   return search ? `?${search}` : "";
 }
 
 function pathForExpenseFilters(filters: ExpenseFilters) {
-  const search = searchForExpenseFilters(filters);
+  const search = searchForExpenseFilters(filters, null);
 
   return `/api/v1/expenses${search}${search ? "&" : "?"}limit=160`;
 }
@@ -183,6 +201,18 @@ function expenseStatusTone(status: ExpenseResponse["status"]) {
   return "amber";
 }
 
+function expenseMatchesScope(expense: ExpenseResponse, scope: ExpenseScope) {
+  if (scope === "business") {
+    return expense.kind !== "SALARY";
+  }
+
+  if (scope === "commissions") {
+    return expense.kind === "SALARY";
+  }
+
+  return true;
+}
+
 export function ExpensesListPage({
   accessToken,
   navigate
@@ -193,6 +223,7 @@ export function ExpensesListPage({
   const [expenses, setExpenses] = useState<ExpenseResponse[]>([]);
   const [authors, setAuthors] = useState<ExpenseListResponse["authors"]>([]);
   const [baseMonth, setBaseMonth] = useState(() => monthFromSearch(window.location.search));
+  const [expenseScope, setExpenseScope] = useState<ExpenseScope>(() => expenseScopeFromSearch(window.location.search));
   const [filters, setFilters] = useState<ExpenseFilters>(() => expenseFiltersFromSearch(window.location.search));
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -202,6 +233,18 @@ export function ExpensesListPage({
   const [confirmingExpenseId, setConfirmingExpenseId] = useState<string | null>(null);
   const [voidingExpenseId, setVoidingExpenseId] = useState<string | null>(null);
   const defaultFilters = useMemo(() => defaultExpenseFilters(baseMonth), [baseMonth]);
+  const visibleExpenses = useMemo(
+    () => expenses.filter((expense) => expenseMatchesScope(expense, expenseScope)),
+    [expenseScope, expenses]
+  );
+  const scopeCounts = useMemo(
+    () => ({
+      business: expenses.filter((expense) => expense.kind !== "SALARY").length,
+      commissions: expenses.filter((expense) => expense.kind === "SALARY").length,
+      all: expenses.length
+    }),
+    [expenses]
+  );
 
   function refresh(nextFilters = filters) {
     setIsLoading(true);
@@ -229,6 +272,7 @@ export function ExpensesListPage({
   useEffect(() => {
     function handlePopState() {
       setBaseMonth(monthFromSearch(window.location.search));
+      setExpenseScope(expenseScopeFromSearch(window.location.search));
       const nextFilters = expenseFiltersFromSearch(window.location.search);
 
       setFilters(nextFilters);
@@ -248,7 +292,7 @@ export function ExpensesListPage({
         ...patch
       };
 
-      window.history.replaceState(null, "", `/money/expenses${searchForExpenseFilters(next, nextBaseMonth)}`);
+      window.history.replaceState(null, "", `/money/expenses${searchForExpenseFilters(next, nextBaseMonth, expenseScope)}`);
       void refresh(next);
 
       return next;
@@ -259,9 +303,14 @@ export function ExpensesListPage({
     updateFilters(dateRangeForMonth(nextMonth), nextMonth);
   }
 
+  function updateScope(nextScope: ExpenseScope) {
+    setExpenseScope(nextScope);
+    window.history.replaceState(null, "", `/money/expenses${searchForExpenseFilters(filters, baseMonth, nextScope)}`);
+  }
+
   const totals = useMemo(
     () =>
-      expenses.reduce(
+      visibleExpenses.reduce(
         (sum, expense) => ({
           confirmed: sum.confirmed + (expense.status === "CONFIRMED" ? expense.amountCents : 0),
           draft: sum.draft + (expense.status === "DRAFT" ? expense.amountCents : 0),
@@ -271,7 +320,7 @@ export function ExpensesListPage({
         }),
         { confirmed: 0, draft: 0, regular: 0, tax: 0, salary: 0 }
       ),
-    [expenses]
+    [visibleExpenses]
   );
 
   async function handleConfirm(expense: ExpenseResponse) {
@@ -343,7 +392,7 @@ export function ExpensesListPage({
             </PrimaryButton>
           </div>
         }
-        count={expenses.length}
+        count={visibleExpenses.length}
         title="Расходы"
       />
 
@@ -365,6 +414,32 @@ export function ExpensesListPage({
             </GhostButton>
           </div>
         ) : null}
+        <div className="mb-4 grid gap-2 md:grid-cols-3">
+          {expenseScopeOptions.map((option) => {
+            const isActive = expenseScope === option.value;
+
+            return (
+              <button
+                aria-label={option.label}
+                aria-pressed={isActive}
+                className={`rounded-lg border px-3 py-3 text-left transition-[background,border-color,color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/30 ${
+                  isActive
+                    ? "border-mint/30 bg-mint/10 text-white"
+                    : "border-white/[0.08] bg-white/[0.04] text-white/70 hover:border-white/[0.16] hover:bg-white/[0.065] hover:text-white"
+                }`}
+                key={option.value}
+                onClick={() => updateScope(option.value)}
+                type="button"
+              >
+                <span className="flex items-center justify-between gap-3">
+                  <span className="font-medium">{option.label}</span>
+                  <span className="text-sm tabular-nums text-white/45">{scopeCounts[option.value]}</span>
+                </span>
+                <span className="mt-1 block text-xs text-white/42">{option.detail}</span>
+              </button>
+            );
+          })}
+        </div>
         <div className="grid gap-3 lg:grid-cols-[minmax(140px,0.75fr)_minmax(140px,0.75fr)_minmax(180px,1fr)_minmax(150px,0.8fr)_auto]">
           <TextField
             label="С"
@@ -420,12 +495,12 @@ export function ExpensesListPage({
       <div className="mt-4 grid gap-3">
         {error ? <p className="rounded-lg bg-coral/12 p-4 text-coral">{error}</p> : null}
         {isLoading ? <p className="rounded-lg bg-white/[0.07] p-4 text-white/55">Загружаем расходы...</p> : null}
-        {!isLoading && expenses.length === 0 ? (
+        {!isLoading && visibleExpenses.length === 0 ? (
           <GlassPanel className="p-5">
             <p className="text-white/62">Расходов пока нет.</p>
           </GlassPanel>
         ) : null}
-        {!isLoading && expenses.length > 0 ? (
+        {!isLoading && visibleExpenses.length > 0 ? (
           <GlassPanel className="hidden overflow-hidden lg:block">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1040px] border-collapse text-left text-sm">
@@ -443,7 +518,7 @@ export function ExpensesListPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.08]">
-                  {expenses.map((expense) => (
+                  {visibleExpenses.map((expense) => (
                     <tr key={expense.id} className="align-top transition-colors hover:bg-white/[0.035]">
                       <td className="px-4 py-3 text-white/55">{dateTime(expense.spentAt)}</td>
                       <td className="max-w-[260px] px-4 py-3">
@@ -499,7 +574,7 @@ export function ExpensesListPage({
             </div>
           </GlassPanel>
         ) : null}
-        {expenses.map((expense) => (
+        {visibleExpenses.map((expense) => (
           <GlassPanel key={expense.id} as="article" className="p-4 lg:hidden">
             <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
               <div>

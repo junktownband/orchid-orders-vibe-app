@@ -28,6 +28,7 @@ export type Screen =
       section: "money";
       view?: "overview" | "expenses" | "expense-create" | "payouts" | "ledger" | "receivables" | "audit";
       month?: string;
+      expenseScope?: "business" | "commissions" | "all";
       orderId?: string;
       itemId?: string;
     }
@@ -472,6 +473,10 @@ export function pathForScreen(screen: Screen) {
     }
 
     if (screen.view === "expenses") {
+      if (screen.expenseScope && screen.expenseScope !== "business") {
+        params.set("scope", screen.expenseScope);
+      }
+
       const search = params.toString();
 
       return `/money/expenses${search ? `?${search}` : ""}`;

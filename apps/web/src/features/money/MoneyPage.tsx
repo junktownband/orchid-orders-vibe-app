@@ -10,6 +10,7 @@ import {
   PieChart,
   ReceiptText,
   Scale,
+  TrendingDown,
   TrendingUp,
   Users,
   WalletCards
@@ -565,7 +566,7 @@ export function MoneyPage({
 
       {error ? <p className="rounded-lg bg-coral/12 p-4 text-coral">{error}</p> : null}
 
-      <section className="grid gap-3 xl:grid-cols-[1.1fr_0.85fr_0.85fr]">
+      <section className="grid gap-3 xl:grid-cols-[1.05fr_0.8fr_0.8fr_0.9fr]">
         <GlassPanel as="article" className="p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <StatHeader icon={CircleDollarSign} label="Счет" title="Операции со счетом" />
@@ -589,11 +590,38 @@ export function MoneyPage({
         <GlassPanel as="article" className="p-4">
           <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center xl:grid-cols-1 xl:items-start">
             <StatHeader icon={ReceiptText} label="Расходы" title="Расходы бизнеса" />
+            <div className="grid gap-3 xl:w-full">
+              <div className="flex items-center justify-between gap-3">
+                <PlainMetric label="Без выплат мастерам" tone="text-[rgb(var(--status-rose-text))]" value={overview ? money(overview.summary.confirmedExpensesCents) : "..."} />
+                <GhostButton onClick={() => navigate({ section: "money", view: "expenses", month })}>
+                  <ReceiptText aria-hidden="true" size={17} />
+                  Расходы
+                </GhostButton>
+              </div>
+            </div>
+          </div>
+        </GlassPanel>
+
+        <GlassPanel as="article" className="p-4">
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center xl:grid-cols-1 xl:items-start">
+            <StatHeader icon={TrendingDown} label="Контроль" title="Все исходящие" />
             <div className="flex items-center justify-between gap-3 xl:w-full">
-              <PlainMetric label="Операционные" tone="text-[rgb(var(--status-rose-text))]" value={overview ? money(overview.summary.confirmedExpensesCents) : "..."} />
-              <GhostButton onClick={() => navigate({ section: "money", view: "expenses", month })}>
+              <PlainMetric
+                label="За месяц"
+                tone="text-[rgb(var(--status-rose-text))]"
+                value={
+                  overview
+                    ? money(
+                        overview.summary.confirmedExpensesCents +
+                          overview.summary.paidCommissionsCents +
+                          overview.summary.manualOutflowCents
+                      )
+                    : "..."
+                }
+              />
+              <GhostButton onClick={() => navigate({ section: "money", view: "expenses", month, expenseScope: "all" })}>
                 <ReceiptText aria-hidden="true" size={17} />
-                Расходы
+                Все
               </GhostButton>
             </div>
           </div>
@@ -631,7 +659,7 @@ export function MoneyPage({
               <PlainMetric label="После выплат" value={overview ? money(overview.account.availableAfterObligationsCents) : "..."} />
               <PlainMetric label="Поступления" tone="text-[rgb(var(--status-sage-text))]" value={overview ? money(overview.summary.paidRevenueCents + overview.summary.manualInflowCents) : "..."} />
               <PlainMetric
-                label="Исходящие"
+                label="Все исходящие"
                 tone="text-[rgb(var(--status-rose-text))]"
                 value={
                   overview
