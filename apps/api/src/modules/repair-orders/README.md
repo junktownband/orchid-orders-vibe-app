@@ -14,6 +14,6 @@ Repair orders are the busiest backend module. Use the smallest file that matches
 ## Business Anchors
 
 - Order numbers are stored without the `R-` prefix, but search accepts legacy `R-0001` input.
-- Tax is calculated from the final paid order amount, independent of expenses.
+- Tax is calculated from the current order total before master commissions. Confirmed item-level expense charges are part of that total once they have been added to the client order.
 - Master commission is per `SERVICE` line: allocated service revenue minus allocated tax, item cost, and confirmed regular expenses linked to that service.
-- Late confirmed item expenses recalculate unpaid issued-order commissions; paid commission lines are not overwritten.
+- Confirmed item expenses charge the linked service/order total to the client and recalculate unpaid issued-order commissions; paid commission lines are not overwritten.

@@ -250,6 +250,8 @@ For commissions, issue stores service-line snapshots on each `SERVICE` item:
 
 The commission base is the service-line final revenue allocation minus the line's proportional order-tax share, line cost, and confirmed regular expenses linked to that line. Non-service/material lines do not generate master commission.
 
+Confirmed regular item-level expenses are charged to the linked line/order total first, so the client-facing order total includes the consumable. The same expense is still treated as service cost and therefore remains in the commission base subtraction.
+
 ## Master Commissions
 
 `GET /api/v1/commissions`
@@ -437,11 +439,15 @@ In the web UI, the expense form starts with order search rather than an order dr
 
 `POST /api/v1/expenses/:id/confirm`
 
-Moves an expense to `CONFIRMED`. Only confirmed expenses are included in dashboard cash analytics. Order item cost remains margin accounting; confirmed expenses are cash accounting.
+Moves an expense to `CONFIRMED`. Only confirmed expenses are included in dashboard cash analytics.
+
+If the expense is a regular expense linked to a concrete order item, confirmation also increases that item price and the order total by the expense amount. This charges the consumable/material to the client while still treating the confirmed expense as service cost for commission math.
 
 `POST /api/v1/expenses/:id/void`
 
-Voids a regular expense with a required reason. Voided expenses stay in history, are excluded from dashboard cash analytics, and no longer reduce unpaid service commission bases. System expenses such as `TAX` and `SALARY` cannot be manually voided.
+Voids a regular expense with a required reason. Voided expenses stay in history, are excluded from dashboard cash analytics, and no longer reduce unpaid service commission bases.
+
+If the voided expense had charged a concrete order item, the backend reverses the item/order charge and recalculates unpaid commissions. The void is rejected if the adjusted order total would become lower than already accepted payments. System expenses such as `TAX` and `SALARY` cannot be manually voided.
 
 ```json
 {
@@ -476,9 +482,12 @@ Query parameters:
 
 - `entityType` optionally filters by entity type, for example `RepairOrder`, `Expense`, or `ServiceCatalogItem`.
 - `entityId` optionally filters by concrete entity id.
+- `scope=finance` narrows the log to finance-related entities for the money section.
 - `limit` defaults to `50` and is capped at `100`.
 
 Tracked events currently include repair order creation, repair order item price/cost changes, assignee changes, status changes, payment marks, payment voids, order issue, expense creation, expense confirmations, expense voids, service catalog item creation/update/deactivation, tax setting changes, customer edits, master membership changes, and master commission payout marks. Audit writes are best-effort and must not break the original business action if logging fails after the action succeeds.
+
+The web money section renders this endpoint as `История изменений` with human-readable rows. The API still returns `beforeJson`/`afterJson` for auditability, but the UI should not expose raw JSON as the primary presentation.
 
 ```json
 {

@@ -26,7 +26,7 @@
 - If `SELF_EMPLOYED` is enabled, the tax subject is selected during order issue:
   - `INDIVIDUAL`: 4%;
   - `BUSINESS`: 6%.
-- Tax is calculated from the current order total, before any expenses are considered.
+- Tax is calculated from the current order total before master commissions. If confirmed item-level expenses have charged consumables to the order total, they are part of that current total.
 - Order issue creates one confirmed system expense with `kind = TAX`.
 - Manual expense creation cannot set `kind = TAX`.
 
@@ -34,7 +34,9 @@
 
 - Manual expenses are always regular expenses.
 - A regular expense can be linked to a whole order or to a concrete order item.
-- Only confirmed regular item-level expenses reduce the commission base of that concrete service line.
+- Confirming a regular item-level expense charges that amount to the concrete order line and order total for the client.
+- Confirmed regular item-level expenses remain cash expenses and reduce the commission base of that concrete service line as service cost.
+- Voiding a confirmed item-level expense reverses the client charge unless the adjusted order total would become lower than already accepted payments.
 - Whole-order regular expenses do not reduce a specific master's commission until a separate allocation rule exists.
 - `SALARY` is a system expense kind created only when a master commission is marked paid.
 - Manual expense creation cannot set `kind = SALARY`.
@@ -45,8 +47,8 @@
 - Fixed services store both the default client price and the default service cost.
 - When a fixed service is added to an order, both values are copied into the order item snapshot.
 - The copied service cost immediately reduces the commission base for that service.
-- Additional materials, purchases, or unusual costs can still be added later as regular item-level expenses for the same service.
-- Expense guidance about commission recalculation is back-office only and must not be shown in master-facing order views.
+- Additional materials, purchases, or unusual costs can still be added later as regular item-level expenses for the same service; when confirmed, they increase the client-facing order total and then reduce the commission base as cost.
+- Expense guidance about client charge and commission cost is back-office only and must not be shown in master-facing order views.
 
 ## Master Commissions
 

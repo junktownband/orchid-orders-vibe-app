@@ -8,7 +8,7 @@ Feature folders keep page-level code out of the app shell so future tasks can re
 - `dashboard` - main KPI screen and quick actions.
 - `orders` - order list, card, issue flow, and order creation.
 - `expenses` - expense register and expense creation.
-- `money` - finance overview, operations ledger, and master payout register.
+- `money` - finance overview, `Движение денег`, `История изменений`, expenses, receivables, and master payout register.
 - `settings` - profile, tax, audit, members, and service catalog settings.
 
 ## Rule

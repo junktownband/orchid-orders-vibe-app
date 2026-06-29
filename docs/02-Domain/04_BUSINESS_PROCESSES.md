@@ -51,7 +51,11 @@ They can be:
 - linked to a whole order;
 - linked to a concrete order item.
 
-Only confirmed regular item-level expenses linked to a `SERVICE` line reduce that service line's master commission base.
+When a regular expense linked to a concrete order item is confirmed, the backend increases that order line price and the order total by the expense amount so the client is charged for the consumable/material. The same confirmed expense remains part of cash expense analytics and reduces that service line's master commission base as cost.
+
+Voiding a confirmed item-level expense reverses the line/order charge and recalculates unpaid commissions. The void is rejected if reversing the charge would make the order total lower than already accepted payments.
+
+Whole-order expenses do not reduce a concrete master's commission until an explicit allocation rule exists.
 
 System expense kinds are never created manually:
 
@@ -90,7 +94,7 @@ If `SELF_EMPLOYED` is enabled, issue asks who the client is:
 - individual: 4%;
 - business or individual entrepreneur: 6%.
 
-Tax is calculated from the full current order total before expenses and before master commissions.
+Tax is calculated from the full current order total before master commissions. If confirmed item-level expenses have already charged consumables/materials to the order total, tax uses that updated total.
 
 Issue stores tax snapshots on the order and creates one confirmed system expense with `kind = TAX`.
 

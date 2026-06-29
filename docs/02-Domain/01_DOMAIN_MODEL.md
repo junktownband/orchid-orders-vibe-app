@@ -84,7 +84,9 @@ Regular expenses can be linked to:
 - a whole order;
 - a concrete order item.
 
-Only confirmed regular item-level expenses reduce the commission base for that service item.
+When a regular expense linked to a concrete order item is confirmed, the backend charges that amount to the linked line and order total for the client. The expense still remains a cash expense, so it is included in expense analytics and also reduces the commission base as service cost. Voiding such an expense reverses the client charge when the adjusted order total would not fall below accepted payments.
+
+Whole-order expenses do not reduce a concrete master's commission until an explicit allocation rule exists.
 
 ## Master Commission
 

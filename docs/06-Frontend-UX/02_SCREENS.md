@@ -56,6 +56,16 @@ Issue screen:
 - asks for payment method only when a remainder exists;
 - asks for tax subject only when self-employment tax is enabled.
 
+## Money
+
+Back-office finance control center for `OWNER`, `ADMIN`, and allowed `MANAGER` users.
+
+The money section separates:
+
+- `Движение денег`: actual cash/account movements such as order payments, confirmed expenses, master payouts, and manual deposits/withdrawals;
+- `История изменений`: finance audit trail, shown as human-readable event cards instead of raw JSON;
+- business expenses, master payouts, receivables, and overview analytics as separate logical blocks.
+
 ## Expenses
 
 Back-office register for `OWNER`, `ADMIN`, and `MANAGER`.
@@ -66,8 +76,8 @@ Manual expenses are regular expenses only. System rows are visible in the list:
 - `SALARY`: created when a master commission is marked paid.
 
 Users cannot manually create `TAX` or `SALARY` expenses.
-Confirming a draft expense must use a confirmation dialog. If the expense is linked to a concrete order item, the UI must explain that unpaid master commission may be recalculated.
-This guidance is back-office only. `MASTER` must not see expense creation screens or commission-impact hints.
+Confirming a draft expense must use a confirmation dialog. If the expense is linked to a concrete order item, the UI must explain that the consumable/material will be charged to the client order total and that master commission is calculated after service cost.
+This guidance is back-office only. `MASTER` must not see expense creation screens or money-impact hints.
 
 ## Payouts
 

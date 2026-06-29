@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Renamed the money operation ledger UI to `Движение денег` and the finance audit UI to `История изменений`.
+- Changed finance audit cards to render human-readable event details instead of raw JSON.
+- Changed confirmed item-level regular expenses to charge the linked service/order total to the client while still treating the expense as service cost for commission math.
 - Added project audit, roadmap, and design system documentation.
 - Updated API documentation to match shared Zod contracts for repair order items and service catalog creation.
 - Added `VITE_API_URL` to `.env.example`.
